@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: who is calling, and are they an admin."""
+"""Shared FastAPI dependencies: who is calling, and are they an admin or a recruiter."""
 from __future__ import annotations
 
 import uuid
@@ -45,4 +45,11 @@ def current_user(authorization: str | None = Header(default=None), db: Session |
 def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admins only.")
+    return user
+
+
+def require_recruiter(user: User = Depends(current_user)) -> User:
+    """Recruiter data belongs to recruiters. Admins manage accounts from the admin console instead."""
+    if user.role != "recruiter":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Recruiters only.")
     return user

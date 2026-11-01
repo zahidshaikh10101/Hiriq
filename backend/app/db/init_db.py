@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from sqlalchemy import inspect
 
-from app.db import models
+from app.db import models, recruiter_models  # noqa: F401  (importing registers every table)
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db import session as db_session
-from app.routers import admin, auth, health
+from app.routers import admin, auth, health, recruiter
 
 log = logging.getLogger("hiriq")
 
@@ -34,6 +34,13 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
 
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    response = await call_next(request)
+    if not request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -44,12 +51,14 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(admin.router, prefix="/api/admin")
+app.include_router(recruiter.router, prefix="/api/recruiter")
 
 # Upcoming routers (see backend/README.md):
-#   /api/resumes  - upload + structured extraction (GenAI)
-#   /api/match    - score a resume against a job, with explanation
-#   /api/jobs     - ingested postings, search
-#   /api/admin    - users, sources, model metrics (users, overview and audit are live)
+#   /api/recruiter - jobs + JD generator (phase 2), resume parser (3), matcher (4), pipeline (5), ask-the-pool (6)
+#   /api/resumes   - candidate-side upload + structured extraction (GenAI)
+#   /api/match     - score a resume against a job, with explanation
+#   /api/jobs      - ingested postings, search
+#   /api/admin     - users, sources, model metrics (users, overview and audit are live)
 
 # Serve the plain HTML/CSS/JS frontend from the same server, so one URL runs everything.
 # Mounted last so /api routes take priority.

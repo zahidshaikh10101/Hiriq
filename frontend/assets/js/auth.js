@@ -128,6 +128,7 @@
   // Right after signing up we send people to finish their profile; on a normal log in we only remind them.
   function afterSignIn(res, justSignedUp) {
     if (res.role === "admin") { window.location.href = "admin.html"; return; }
+    if (res.role === "recruiter" && !(res.needsProfile && justSignedUp)) { window.location.href = "recruiter.html"; return; }
     if (res.needsProfile && justSignedUp) { window.location.href = "complete-profile.html"; return; }
     notify(msgBox, "good", res.needsProfile
       ? "Signed in. Open complete-profile.html to add your date of birth (it creates your username) and your phone."

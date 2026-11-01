@@ -1,0 +1,226 @@
+/* =========================================================
+   Hiriq — recruiter workspace (recruiter.html)
+   Builds on admin.css (layout, sidebar, KPI tiles, tables). Only what is new lives here.
+   ========================================================= */
+
+.rec-tag {
+  border-color: rgb(var(--a4) / 0.5);
+  background: rgb(var(--a4) / 0.16);
+  color: #b6f7e0;
+}
+.side-nav a .soon {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.05);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--ink) / 0.6);
+}
+
+/* Welcome + quick actions */
+.welcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.welcome p {
+  margin: 0;
+  color: rgb(var(--ink) / 0.7);
+  font-size: 15px;
+}
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.quick .btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.phase-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.25);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Onboarding card shown while the account is empty */
+.start-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.start-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.04);
+  font-size: 14px;
+}
+.start-steps b {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(var(--a1));
+}
+.start-steps span {
+  color: rgb(var(--ink) / 0.65);
+  font-size: 13px;
+}
+
+.sample-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--warn) / 0.45);
+  background: rgb(var(--warn) / 0.1);
+  font-size: 14px;
+}
+.sample-banner svg { flex-shrink: 0; margin-top: 2px; color: rgb(var(--warn)); }
+.sample-banner code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.08);
+  word-break: break-all;
+}
+
+/* Horizontal bars (funnel, skills) */
+.rbar-row { display: flex; flex-direction: column; gap: 6px; }
+.rbar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+}
+.rbar-top small { font-size: 12px; color: rgb(var(--ink) / 0.6); }
+.rbar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.07);
+  overflow: hidden;
+}
+.rbar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left;
+  animation: bar-grow-x 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  background: linear-gradient(90deg, rgb(var(--a1)), rgb(var(--a3)));
+}
+.rbar-fill.good { background: linear-gradient(90deg, rgb(var(--a4)), rgb(var(--a2))); }
+.rbar-fill.gap { background: rgb(var(--bad) / 0.85); }
+@keyframes bar-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.drop {
+  align-self: flex-start;
+  margin: -2px 0 0 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--bad) / 0.35);
+  background: rgb(var(--bad) / 0.08);
+  color: #ffb3bf;
+  font-size: 12px;
+  font-weight: 600;
+}
+.drop.flat { border-color: rgb(255 255 255 / 0.14); background: rgb(255 255 255 / 0.04); color: rgb(var(--ink) / 0.6); }
+
+/* Job health rows */
+.hrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.04);
+}
+.hrow .cell-stack { flex: 1; min-width: 0; }
+.hrow .cell-stack strong { font-size: 14px; }
+.hrow .cell-stack span { font-size: 13px; color: rgb(var(--ink) / 0.7); }
+.hrow .num { font-family: var(--font-mono); font-size: 12px; color: rgb(var(--ink) / 0.6); white-space: nowrap; }
+.state-dot { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; flex-shrink: 0; }
+.state-good { background: rgb(var(--a4)); box-shadow: 0 0 10px rgb(var(--a4)); }
+.state-warn { background: rgb(var(--warn)); box-shadow: 0 0 10px rgb(var(--warn)); }
+.state-bad { background: rgb(var(--bad)); box-shadow: 0 0 10px rgb(var(--bad)); }
+
+/* Match quality */
+.job-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.bands { display: flex; align-items: flex-end; gap: 10px; height: 150px; padding-top: 22px; border-bottom: 1px solid rgb(255 255 255 / 0.14); }
+.band { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 4px; }
+.band .count { font-family: var(--font-mono); font-size: 12px; color: rgb(var(--ink) / 0.75); }
+.band .col {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 6px 6px 0 0;
+  background: rgb(var(--a1) / 0.75);
+  transform-origin: bottom;
+  animation: bar-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.band.strong .col { background: rgb(var(--a4)); }
+.band-labels { display: flex; gap: 10px; font-family: var(--font-mono); font-size: 11px; color: rgb(var(--ink) / 0.6); }
+.band-labels span { flex: 1; text-align: center; }
+.top-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.top-list li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.04); font-size: 14px; }
+.top-list .rank { width: 22px; font-family: var(--font-mono); font-size: 12px; color: rgb(var(--ink) / 0.55); }
+.top-list .cell-stack { flex: 1; min-width: 0; }
+.score-chip {
+  min-width: 46px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  background: rgb(var(--a1) / 0.2);
+  border: 1px solid rgb(var(--a1) / 0.5);
+}
+.score-chip.strong { background: rgb(var(--a4) / 0.18); border-color: rgb(var(--a4) / 0.55); }
+
+/* Needs action */
+.todo { display: flex; flex-direction: column; gap: 8px; }
+.todo-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 600; }
+.todo-head .mono { font-size: 20px; }
+.todo ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.todo li { font-size: 13px; color: rgb(var(--ink) / 0.78); padding: 8px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.04); }
+.todo li small { color: rgb(var(--ink) / 0.55); }
+
+.empty-inline { margin: 0; padding: 6px 0; font-size: 13.5px; color: rgb(var(--ink) / 0.6); }
+
+/* Placeholder pages for modules that come in later phases */
+.soon-card { max-width: 720px; }
+.soon-card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: rgb(var(--ink) / 0.78); font-size: 14.5px; }
+.phase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--a1) / 0.45);
+  background: rgb(var(--a1) / 0.12);
+  color: #cfe0ff;
+  font-size: 13px;
+  font-weight: 600;
+}
