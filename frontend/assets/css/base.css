@@ -1,0 +1,253 @@
+/* =========================================================
+   Hiriq — base: fonts, Neon night tokens, reset, utilities,
+   keyframes. Every page loads this first.
+   ========================================================= */
+
+/* Fonts are bundled locally (SIL Open Font License) — no internet needed. */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("../fonts/bricolage-grotesque.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+/* Colours are RGB channels so any of them can take an opacity:
+   rgb(var(--a1) / .2)  →  cyan at 20% */
+:root {
+  --bg: 5 7 13;
+  --bg2: 11 15 28;
+  --panel: 16 20 36;
+  --panel2: 8 10 20;
+  --ink: 234 242 255;
+  --a1: 45 226 230;   /* cyan   */
+  --a2: 106 168 255;  /* blue   */
+  --a3: 139 123 255;  /* violet */
+  --a4: 46 230 168;   /* mint / good */
+  --warn: 255 181 71;
+  --bad: 255 122 144;
+  --on: 4 18 26;      /* text on gradient buttons */
+
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --grad: linear-gradient(120deg, rgb(var(--a1)), rgb(var(--a2)) 55%, rgb(var(--a3)));
+  --page: 1200px;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: rgb(var(--bg));
+  scroll-behavior: smooth;
+  scroll-padding-top: 110px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img,
+svg {
+  display: block;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: rgb(var(--a1));
+  text-decoration: none;
+}
+a:hover {
+  color: #9cf3f5;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+::selection {
+  background: rgb(var(--a1) / 0.35);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--a1));
+  outline-offset: 3px;
+}
+
+input::placeholder {
+  color: rgb(var(--ink) / 0.55);
+}
+select option {
+  background: rgb(var(--bg2));
+  color: rgb(var(--ink));
+}
+
+/* ---------- Utilities ---------- */
+.container {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.muted {
+  color: rgb(var(--ink) / 0.7);
+}
+.faint {
+  color: rgb(var(--ink) / 0.6);
+}
+.eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--a1));
+}
+.eyebrow.mint {
+  color: rgb(var(--a4));
+}
+.eyebrow.violet {
+  color: rgb(var(--a3));
+}
+
+/* Layout helpers used on every page */
+.row-between {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stack-2 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+/* Animated gradient text */
+.grad-text {
+  background: linear-gradient(110deg, rgb(var(--a1)), rgb(var(--a2)), rgb(var(--a3)), rgb(var(--a1)));
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: grad-shift 6s ease-in-out infinite;
+}
+
+/* Scroll reveal: elements with data-reveal fade up when they enter the screen (effects.js) */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-reveal].in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Keyframes ---------- */
+@keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1) } 50% { transform: translate(70px,50px) scale(1.14) } }
+@keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1) } 50% { transform: translate(-80px,60px) scale(1.1) } }
+@keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+@keyframes floaty2 { 0%,100% { transform: translateY(0) rotate(0) } 50% { transform: translateY(12px) rotate(-1.5deg) } }
+@keyframes rise { from { opacity: 0; transform: translateY(26px) } to { opacity: 1; transform: none } }
+@keyframes swap-in { from { opacity: 0; transform: translateX(18px) } to { opacity: 1; transform: none } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(40px) } to { opacity: 1; transform: none } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: none } }
+@keyframes sheen { 0%,60% { transform: translateX(-120%) } 100% { transform: translateX(120%) } }
+@keyframes marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+@keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .45; transform: scale(1.7) } }
+@keyframes grad-shift { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }
+@keyframes fill-x { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes bar-grow { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+@keyframes border-spin { from { transform: translate(-50%,-50%) rotate(0) } to { transform: translate(-50%,-50%) rotate(360deg) } }
+@keyframes spin-slow { to { transform: rotate(360deg) } }
+@keyframes word-swap { 0% { opacity: 0; transform: translateY(.45em); filter: blur(6px) } 5%,29% { opacity: 1; transform: none; filter: none } 34%,100% { opacity: 0; transform: translateY(-.45em); filter: blur(6px) } }
+@keyframes twinkle { 0%,100% { opacity: .12 } 50% { opacity: .85 } }
+@keyframes meteor { 0% { opacity: 0; transform: rotate(-38deg) translateX(0) } 3% { opacity: 1 } 20% { opacity: 0; transform: rotate(-38deg) translateX(-1100px) } 100% { opacity: 0; transform: rotate(-38deg) translateX(-1100px) } }
+@keyframes scan { 0%,100% { top: 6% } 50% { top: 92% } }
+@keyframes chip-cycle { 0%,8% { opacity: 0; transform: translateY(10px) scale(.9) } 16%,80% { opacity: 1; transform: none } 92%,100% { opacity: 0; transform: translateY(-6px) } }
+@keyframes row-cycle { 0%,6% { opacity: 0; transform: translateX(34px) } 14%,82% { opacity: 1; transform: none } 94%,100% { opacity: 0; transform: translateX(-20px) } }
+@keyframes travel { 0% { left: 0; opacity: 0 } 10% { opacity: 1 } 90% { opacity: 1 } 100% { left: calc(100% - 12px); opacity: 0 } }
+@keyframes bounce-soft { 0%,100% { transform: translateY(0) } 40% { transform: translateY(-8px) } 60% { transform: translateY(2px) } }
+@keyframes eq { 0%,100% { transform: scaleY(.35) } 50% { transform: scaleY(1) } }
+@keyframes outline-sweep { from { background-position: 120% 0 } to { background-position: -120% 0 } }
+@keyframes glow-pulse { 0%,100% { box-shadow: 0 0 0 0 rgb(var(--a1) / .45) } 50% { box-shadow: 0 0 0 14px rgb(var(--a1) / 0) } }
+@keyframes draw { from { stroke-dashoffset: 400 } to { stroke-dashoffset: 0 } }
+
+/* Respect the visitor's "reduce motion" setting everywhere */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}

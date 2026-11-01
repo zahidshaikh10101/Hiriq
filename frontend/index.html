@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hiriq — know exactly why you match</title>
+  <meta name="description" content="Hiriq scores a resume against a job description and explains the score: matched skills, gaps and the next fix.">
+  <meta name="theme-color" content="#05070D">
+  <link rel="icon" href="assets/img/logo-mark.png">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/landing.css">
+</head>
+<body>
+  <script src="assets/js/icons.js"></script>
+  <div class="space-bg" data-stars="60" aria-hidden="true"></div>
+
+  <!-- ===== Nav ===== -->
+  <div class="nav-wrap container">
+    <header class="nav glass">
+      <a href="index.html" class="logo" aria-label="Hiriq home"><img src="assets/img/logo-full.png" alt="Hiriq"></a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#product">Product</a>
+        <a href="#engine">Engine</a>
+        <a href="#how">How it works</a>
+        <a href="#trust">Fairness</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-plain">Log in</a>
+        <a href="signup.html" class="btn btn-grad">Get started</a>
+      </div>
+    </header>
+  </div>
+
+  <main>
+    <!-- ===== Hero ===== -->
+    <section class="hero container">
+      <div class="hero-copy">
+        <div class="pill-badge glass"><span class="dot pulse" style="background:rgb(var(--a4))"></span>Resume-to-job matching, explained</div>
+        <h1>
+          Know exactly
+          <span class="sr-only"> why you match.</span>
+          <span class="rotator" aria-hidden="true">
+            <span><span class="grad-text">why you match.</span></span>
+            <span><span class="grad-text">what's missing.</span></span>
+            <span><span class="grad-text">who fits best.</span></span>
+          </span>
+        </h1>
+        <p class="hero-lead">Hiriq scores a resume against a job description and shows the matched skills, the gaps and the next fix. Candidates get direction. Recruiters get a ranked shortlist with reasons.</p>
+        <div class="hero-actions">
+          <a href="signup.html" class="btn btn-grad btn-lg">Get started free <svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-arrow"></use></svg></a>
+          <a href="#engine" class="btn btn-ghost btn-lg glass">See the engine</a>
+        </div>
+        <p class="faint" style="font-size:14px">Free to start. Sign in with Google, email or phone.</p>
+      </div>
+
+      <div class="hero-visual" id="hero-visual">
+        <div class="tilt" id="hero-tilt">
+          <div class="hero-stage">
+            <div class="glow-border hero-card">
+              <div class="glow-inner">
+                <div class="row-between">
+                  <div class="stack-2">
+                    <span class="card-kicker">Matched against</span>
+                    <span class="card-title">Senior Data Analyst</span>
+                  </div>
+                  <span class="tag-outline">Sample result</span>
+                </div>
+                <div class="score-row">
+                  <div class="score-ring">
+                    <div class="halo" aria-hidden="true"></div>
+                    <svg width="112" height="112" viewBox="0 0 112 112" role="img" aria-label="Match score 82 out of 100">
+                      <defs>
+                        <linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0" stop-color="rgb(45,226,230)"/>
+                          <stop offset="1" stop-color="rgb(139,123,255)"/>
+                        </linearGradient>
+                      </defs>
+                      <circle cx="56" cy="56" r="42" fill="none" stroke="rgb(255 255 255 / .12)" stroke-width="9"/>
+                      <circle class="arc" cx="56" cy="56" r="42" fill="none" stroke="url(#ring-grad)" stroke-width="9" stroke-linecap="round" stroke-dasharray="263.9" stroke-dashoffset="47.5" transform="rotate(-90 56 56)"/>
+                      <text id="score-num" data-target="82" x="56" y="65" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="500" font-size="28" fill="rgb(234,242,255)">82</text>
+                    </svg>
+                  </div>
+                  <div class="score-text">
+                    <strong>Strong match</strong>
+                    <span>Four of six required skills found. Experience sits inside the range the role asks for.</span>
+                  </div>
+                </div>
+                <div class="skill-group">
+                  <span class="skill-label">Matched skills</span>
+                  <div class="chips">
+                    <span class="chip chip-cyan" style="animation-delay:1s">Python</span>
+                    <span class="chip chip-cyan" style="animation-delay:1.15s">SQL</span>
+                    <span class="chip chip-cyan" style="animation-delay:1.3s">Power BI</span>
+                    <span class="chip chip-cyan" style="animation-delay:1.45s">Pandas</span>
+                  </div>
+                </div>
+                <div class="skill-group">
+                  <span class="skill-label">Missing</span>
+                  <div class="chips">
+                    <span class="chip chip-dashed" style="animation-delay:1.6s">dbt</span>
+                    <span class="chip chip-dashed" style="animation-delay:1.75s">Airflow</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="float-chip top glass">
+              <svg class="i" width="18" height="18" aria-hidden="true" style="color:rgb(var(--a4))"><use href="#i-check"></use></svg>Python matched
+            </div>
+            <div class="float-chip bottom glass">
+              <span class="mail-icon"><svg class="i" width="20" height="20" aria-hidden="true"><use href="#i-mail"></use></svg></span>
+              <span>Morning job alert<small>Sample alert</small></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Marquees (filled by landing.js) ===== -->
+    <section class="marquees" aria-label="Skills and roles Hiriq reads">
+      <p class="eyebrow faint">Reads the skills and roles that matter</p>
+      <div class="marquee" data-items="Python,SQL,PySpark,Power BI,Pandas,scikit-learn,dbt,Airflow,FastAPI,Docker,RAG,Tableau,Kafka,Snowflake"><div class="marquee-track"></div></div>
+      <div class="marquee reverse" data-items="Data Analyst,Data Scientist,GenAI Engineer,ML Engineer,BI Analyst,Business Analyst,Analytics Engineer,Product Analyst"><div class="marquee-track"></div></div>
+    </section>
+
+    <!-- ===== Workspaces ===== -->
+    <section class="section container" id="product">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Product</span>
+        <h2 class="section-title">One matching engine. <span class="grad-text">Three workspaces.</span></h2>
+        <p class="section-lead">The same scoring powers every view, so what a candidate sees and what a recruiter sees always agree.</p>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Workspaces">
+        <button class="tab" role="tab" id="tab-candidate" aria-controls="panel-candidate" aria-selected="true">Candidate</button>
+        <button class="tab" role="tab" id="tab-recruiter" aria-controls="panel-recruiter" aria-selected="false" tabindex="-1">Recruiter</button>
+        <button class="tab" role="tab" id="tab-admin" aria-controls="panel-admin" aria-selected="false" tabindex="-1">Admin</button>
+      </div>
+
+      <div class="glow-border workspace" data-reveal>
+        <div class="glow-inner">
+          <div class="panel animate" role="tabpanel" id="panel-candidate" aria-labelledby="tab-candidate">
+            <div class="panel-copy">
+              <h3>See the gap, then close it.</h3>
+              <ul class="checklist">
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Score any resume against any job description</li>
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Matched and missing skills, plus the experience gap</li>
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Relevant jobs for your profile, with morning job alerts</li>
+              </ul>
+            </div>
+            <div class="viz">
+              <div class="viz-head">Skill gap across matched jobs <span>Sample data</span></div>
+              <div class="meter"><div class="meter-top"><span>Python</span><span class="mono">93%</span></div><div class="bar-track"><div class="bar-fill have" style="width:93%;animation-delay:.15s"></div></div></div>
+              <div class="meter"><div class="meter-top"><span>SQL</span><span class="mono">87%</span></div><div class="bar-track"><div class="bar-fill have" style="width:87%;animation-delay:.3s"></div></div></div>
+              <div class="meter"><div class="meter-top"><span>dbt <span class="faint">(you lack this)</span></span><span class="mono">53%</span></div><div class="bar-track"><div class="bar-fill lack" style="width:53%;animation-delay:.45s"></div></div></div>
+              <div class="meter"><div class="meter-top"><span>Airflow <span class="faint">(you lack this)</span></span><span class="mono">40%</span></div><div class="bar-track"><div class="bar-fill lack" style="width:40%;animation-delay:.6s"></div></div></div>
+            </div>
+          </div>
+
+          <div class="panel" role="tabpanel" id="panel-recruiter" aria-labelledby="tab-recruiter" hidden>
+            <div class="panel-copy">
+              <h3>A shortlist you can defend.</h3>
+              <ul class="checklist">
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Upload resumes in bulk and rank them against a job description</li>
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Every score comes with matched skills and gaps</li>
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Compare candidates side by side and track them through a pipeline</li>
+              </ul>
+            </div>
+            <div class="viz">
+              <div class="viz-head">Ranked shortlist <span>Sample data</span></div>
+              <div class="rank-row glass" style="animation-delay:.15s"><span class="mono faint">01</span><span class="name">Candidate A</span><div class="bar-track mini"><div class="bar-fill" style="width:91%;animation-delay:.3s"></div></div><span class="mono">91</span></div>
+              <div class="rank-row glass" style="animation-delay:.3s"><span class="mono faint">02</span><span class="name">Candidate B</span><div class="bar-track mini"><div class="bar-fill" style="width:84%;animation-delay:.45s"></div></div><span class="mono">84</span></div>
+              <div class="rank-row glass" style="animation-delay:.45s"><span class="mono faint">03</span><span class="name">Candidate C</span><div class="bar-track mini"><div class="bar-fill" style="width:77%;animation-delay:.6s"></div></div><span class="mono">77</span></div>
+            </div>
+          </div>
+
+          <div class="panel" role="tabpanel" id="panel-admin" aria-labelledby="tab-admin" hidden>
+            <div class="panel-copy">
+              <h3>See the platform and the model.</h3>
+              <ul class="checklist">
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Role-based access for every workspace</li>
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Usage, job-market and funnel dashboards</li>
+                <li><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-check"></use></svg>Model quality tracked over time, with an audit log</li>
+              </ul>
+            </div>
+            <div class="viz">
+              <div class="viz-head">Uploads per day <span>Sample data</span></div>
+              <div class="cols">
+                <span style="height:60px;animation-delay:.05s"></span><span style="height:84px;animation-delay:.12s"></span><span style="height:72px;animation-delay:.19s"></span><span style="height:110px;animation-delay:.26s"></span><span style="height:96px;animation-delay:.33s"></span><span style="height:128px;animation-delay:.4s"></span><span class="hl" style="height:104px;animation-delay:.47s"></span>
+              </div>
+              <div class="col-labels"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Engine ===== -->
+    <section class="section container" id="engine">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Inside the engine</span>
+        <h2 class="section-title">Parse. Match. Explain. <span class="grad-text">Deliver.</span></h2>
+      </div>
+      <div class="bento">
+        <div class="bento-card wide glass lift" data-reveal>
+          <div class="bento-copy">
+            <span class="step-no">01 / Parse</span>
+            <h3>Resumes become structured data.</h3>
+            <p>Skills, roles, dates and education are pulled into fields you can review and correct.</p>
+          </div>
+          <div class="parse-viz">
+            <div class="doc" aria-hidden="true">
+              <i class="h" style="width:55%"></i><i style="width:80%"></i><i style="width:70%"></i>
+              <i class="gap" style="width:86%"></i><i style="width:62%"></i><i style="width:76%"></i>
+              <i class="gap" style="width:50%"></i><i style="width:68%"></i>
+              <span class="scan-line"></span>
+            </div>
+            <div class="parse-chips">
+              <span class="chip chip-cyan">Python</span>
+              <span class="chip chip-cyan" style="animation-delay:.4s">4 yrs exp</span>
+              <span class="chip chip-violet" style="animation-delay:.8s">M.Tech</span>
+              <span class="chip chip-violet" style="animation-delay:1.2s">Power BI</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bento-card narrow glass lift" data-reveal>
+          <span class="step-no">02 / Match</span>
+          <h3>Meaning, not just keywords.</h3>
+          <div class="link-viz">
+            <span class="node cyan">Resume</span>
+            <div class="wire" aria-hidden="true"><span></span><span></span></div>
+            <span class="node violet">Job</span>
+          </div>
+          <p>Embeddings link “PyTorch” to “deep learning” without a hand-built synonym list.</p>
+        </div>
+
+        <div class="bento-card narrow glass lift" data-reveal>
+          <span class="step-no">03 / Explain</span>
+          <div class="row-between">
+            <h3>Why this score?</h3>
+            <div class="eq" aria-hidden="true">
+              <span style="background:rgb(var(--a1))"></span><span style="background:rgb(var(--a2));animation-delay:.2s"></span><span style="background:rgb(var(--a3));animation-delay:.4s"></span><span style="background:rgb(var(--a4));animation-delay:.6s"></span>
+            </div>
+          </div>
+          <div class="reason good"><svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-check"></use></svg>4 of 6 required skills matched</div>
+          <div class="reason good" style="animation-delay:.35s"><svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-check"></use></svg>Experience inside the asked range</div>
+          <div class="reason gap" style="animation-delay:.7s"><svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-info"></use></svg>Missing: dbt, Airflow</div>
+        </div>
+
+        <div class="bento-card wide glass lift" data-reveal>
+          <div class="bento-copy">
+            <span class="step-no">04 / Deliver</span>
+            <h3>Job alerts, every morning.</h3>
+            <p>New postings are matched overnight and the best fits land in your inbox, with an unsubscribe link in every alert.</p>
+          </div>
+          <div class="inbox">
+            <div class="inbox-head">
+              <span class="mail-icon"><svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-mail"></use></svg></span>
+              <span class="stack-2"><strong style="font-size:14px">Today's job alert</strong><span class="faint" style="font-size:12px">Sample alert</span></span>
+            </div>
+            <div class="inbox-row"><span class="where">Data Scientist <em>· Pune</em></span><span class="mono">88</span></div>
+            <div class="inbox-row" style="animation-delay:.3s"><span class="where">GenAI Engineer <em>· Bengaluru</em></span><span class="mono">81</span></div>
+            <div class="inbox-row" style="animation-delay:.6s"><span class="where">BI Analyst <em>· Remote</em></span><span class="mono">76</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== How it works ===== -->
+    <section class="section container" id="how">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">How it works</span>
+        <h2 class="section-title">From resume to next step in three moves.</h2>
+      </div>
+      <div class="steps">
+        <div class="step glass lift" data-reveal>
+          <span class="step-icon"><svg class="i" width="24" height="24" aria-hidden="true"><use href="#i-upload"></use></svg></span>
+          <h3>Upload</h3>
+          <p>Drop in a resume. Hiriq pulls skills, experience and education into structured fields you can review and correct.</p>
+        </div>
+        <div class="step glass lift" data-reveal>
+          <span class="step-icon" style="animation-delay:1s"><svg class="i" width="24" height="24" aria-hidden="true"><use href="#i-link"></use></svg></span>
+          <h3>Match</h3>
+          <p>Paste a job description or pick one from the library. Semantic matching produces a score with the reasons behind it.</p>
+        </div>
+        <div class="step glass lift" data-reveal>
+          <span class="step-icon" style="animation-delay:2s"><svg class="i" width="24" height="24" aria-hidden="true"><use href="#i-arrow"></use></svg></span>
+          <h3>Act</h3>
+          <p>Close the gaps, apply to the best-fit jobs, or move the strongest candidates to the next stage.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Fairness ===== -->
+    <section class="section container" id="trust" style="padding-top:40px">
+      <div class="glow-border trust" data-reveal>
+        <div class="glow-inner">
+          <div class="section-head">
+            <span class="eyebrow mint">Fairness</span>
+            <h2 class="section-title" style="font-size:clamp(32px,4.2vw,50px)">Built to be explained, not trusted blindly.</h2>
+          </div>
+          <div class="trust-items">
+            <div class="trust-item">
+              <span class="trust-icon"><svg class="i" width="26" height="26" aria-hidden="true"><use href="#i-eye"></use></svg></span>
+              <h3>Scores show why</h3>
+              <p>Every number comes with the matched skills, the missing ones and the experience gap.</p>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon"><svg class="i" width="26" height="26" aria-hidden="true"><use href="#i-shield"></use></svg></span>
+              <h3>Sensitive fields stay out</h3>
+              <p>Name, gender, photo and college are kept out of the scoring features by design.</p>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon"><svg class="i" width="26" height="26" aria-hidden="true"><use href="#i-user"></use></svg></span>
+              <h3>People decide</h3>
+              <p>Hiriq ranks and explains. A recruiter makes every hiring decision. Nothing is auto-rejected.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CTA ===== -->
+    <section class="container" style="padding-bottom:64px">
+      <div class="cta glass" data-reveal>
+        <div class="glow-blob" aria-hidden="true"></div>
+        <div class="cta-mark" aria-hidden="true"><div class="ring"></div><img src="assets/img/logo-mark.png" alt=""></div>
+        <h2>Find out <span class="grad-text">why you match.</span></h2>
+        <p>Upload a resume, paste a job description and get your first explained score in minutes.</p>
+        <div class="hero-actions" style="justify-content:center">
+          <a href="signup.html" class="btn btn-grad btn-lg">Create your account <svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-arrow"></use></svg></a>
+          <a href="login.html" class="btn btn-ghost btn-lg glass">Log in</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="container" aria-hidden="true"><div class="wordmark">hiriq</div></div>
+  <footer class="footer">
+    <div class="container">
+      <a href="index.html" class="logo" aria-label="Hiriq home"><img src="assets/img/logo-full.png" alt="Hiriq"></a>
+      <span class="faint">A portfolio project by Zahid Shaikh. © 2026</span>
+      <div class="footer-links"><a href="login.html">Log in</a><a href="signup.html">Sign up</a></div>
+    </div>
+  </footer>
+
+  <script src="assets/js/effects.js"></script>
+  <script src="assets/js/landing.js"></script>
+</body>
+</html>

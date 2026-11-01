@@ -1,0 +1,50 @@
+"""Bring an existing database up to the current schema.  Safe to run any number of times.
+
+    python -m app.db.upgrade
+
+The API also runs this once when it starts, so a new column or rule never leaves you with a crashing signup.
+What it does today:
+ - users.date_of_birth (new column)
+ - otp_codes accepts the purpose 'reset' (forgot password) as well as 'signup'
+Your users, admins and audit log are never touched.
+"""
+from __future__ import annotations
+
+from sqlalchemy import inspect, text
+
+from app.db import models  # noqa: F401  (registers the tables)
+from app.db.init_db import init_db
+from app.db.session import engine
+
+NEW_PURPOSES = "purpose IN ('signup', 'reset')"
+
+
+def upgrade() -> list[str]:
+    if engine is None:
+        raise SystemExit("DATABASE_URL is not set. Put it in backend/.env first.")
+    done: list[str] = []
+    init_db()  # creates anything missing, seeds plans
+
+    cols = {c["name"] for c in inspect(engine).get_columns("users")}
+    with engine.begin() as conn:
+        if "date_of_birth" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN date_of_birth DATE"))
+            done.append("added users.date_of_birth")
+
+        if engine.dialect.name == "postgresql":
+            rows = conn.execute(text(
+                "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conrelid = 'otp_codes'::regclass AND contype = 'c'"
+            )).all()
+            purpose_checks = [(n, d) for n, d in rows if "purpose" in d]
+            if not any("reset" in d for _, d in purpose_checks):
+                for name, _ in purpose_checks:
+                    conn.execute(text(f'ALTER TABLE otp_codes DROP CONSTRAINT "{name}"'))
+                conn.execute(text(f"ALTER TABLE otp_codes ADD CONSTRAINT ck_otp_purpose CHECK ({NEW_PURPOSES})"))
+                done.append("otp_codes now accepts password-reset codes")
+    return done
+
+
+if __name__ == "__main__":
+    changes = upgrade()
+    print("Database upgraded:" if changes else "Database already up to date.", *changes, sep="\n  - " if changes else "")

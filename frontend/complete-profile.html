@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Complete your profile · Hiriq</title>
+  <meta name="theme-color" content="#05070D">
+  <link rel="icon" href="assets/img/logo-mark.png">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+  <script src="assets/js/icons.js"></script>
+  <div class="space-bg" data-stars="45" data-seed="17" aria-hidden="true"></div>
+
+  <div class="auth">
+    <main class="auth-main">
+      <a href="index.html" class="logo" aria-label="Hiriq home"><img src="assets/img/logo-full.png" alt="Hiriq"></a>
+
+      <div class="glow-border auth-card">
+        <div class="glow-inner">
+          <div class="field-group" style="gap:10px">
+            <h1 class="auth-title" style="font-size:40px">Complete your <span class="grad-text">profile.</span></h1>
+            <p class="auth-lead" id="profile-lead">Add a few details so Hiriq can reach you and tailor your matches. Your date of birth gives you a username; the rest is optional.</p>
+          </div>
+
+          <form class="form" id="profile-form" novalidate>
+            <div class="field-group" id="username-row" hidden>
+              <span class="label">Your username</span>
+              <div class="field" style="display:flex;align-items:center" aria-live="polite"><strong class="mono" id="username-value"></strong></div>
+              <span class="hint">Log in with this or your email. It is made from your initials and birth date and does not change.</span>
+            </div>
+            <div class="field-group" id="dob-row">
+              <label class="label" for="dob">Date of birth</label>
+              <input class="field" id="dob" type="date" autocomplete="bday" min="1900-01-01" style="color-scheme:dark">
+              <span class="hint" id="dob-hint">We use it to create your username (initials plus birth date). It is not shown to other users.</span>
+            </div>
+            <div class="field-group">
+              <label class="label" for="phone">Mobile number</label>
+              <div class="phone">
+                <select class="field" id="country" aria-label="Country code">
+                  <option value="+91">+91 IN</option><option value="+971">+971 AE</option><option value="+1">+1 US</option><option value="+44">+44 UK</option>
+                </select>
+                <input class="field" id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="98765 43210" data-phone>
+              </div>
+              <span class="hint">We do not text you a code. It is only used to contact you about your account.</span>
+            </div>
+            <div class="field-group">
+              <label class="label" for="designation">Designation</label>
+              <input class="field" id="designation" type="text" autocomplete="organization-title" placeholder="e.g. Data Analyst">
+            </div>
+            <div class="field-group">
+              <label class="label" for="company">Company</label>
+              <input class="field" id="company" type="text" autocomplete="organization" placeholder="Where you work now">
+            </div>
+            <button type="submit" class="btn btn-grad btn-block" id="profile-save">Save profile <svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-arrow"></use></svg></button>
+          </form>
+
+          <div id="profile-message" aria-live="polite"></div>
+
+          <p class="switch-line"><a href="index.html">Skip for now</a></p>
+        </div>
+      </div>
+
+      <p class="auth-foot">You can change these any time from your account.</p>
+    </main>
+
+    <aside class="auth-aside">
+      <div class="aside-panel glass">
+        <div class="orbit" aria-hidden="true" style="width:320px;height:320px">
+          <div class="ring r1"><span></span></div>
+          <div class="ring r2" style="inset:44px"><span></span></div>
+          <div class="ring r3" style="inset:88px"><span></span></div>
+          <div class="core"></div>
+          <img src="assets/img/logo-mark.png" alt="" style="height:126px">
+        </div>
+        <div class="fair-note glass">
+          <svg class="i" width="24" height="24" aria-hidden="true"><use href="#i-shield"></use></svg>
+          Name, gender, photo and college stay out of the scoring. A person makes every hiring decision.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="assets/js/effects.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/auth-client.js"></script>
+  <script src="assets/js/profile.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin · Hiriq</title>
+  <meta name="theme-color" content="#05070D">
+  <link rel="icon" href="assets/img/logo-mark.png">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <!-- Send visitors without an admin session to the login page before anything renders -->
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/auth-client.js"></script>
+</head>
+<body>
+  <script src="assets/js/icons.js"></script>
+  <script>window.HiriqAuth.requireAdmin();</script>
+  <div class="space-bg" data-stars="40" data-seed="31" data-meteors="off" data-spotlight="off" aria-hidden="true"></div>
+
+  <div class="admin">
+    <aside class="sidebar glass">
+      <div class="sidebar-top">
+        <a href="index.html" class="logo" aria-label="Hiriq home"><img src="assets/img/logo-full.png" alt="Hiriq"></a>
+        <span class="role-tag">Admin</span>
+      </div>
+      <nav class="side-nav" aria-label="Admin sections">
+        <a href="#overview">Overview</a>
+        <a href="#users">Users &amp; roles</a>
+        <a href="#jobs">Jobs &amp; sources</a>
+        <a href="#model">Model quality</a>
+        <a href="#audit">Audit log</a>
+      </nav>
+      <div class="side-bottom">
+        <div class="me card">
+          <span class="avatar lg">A</span>
+          <span class="cell-stack"><strong style="font-size:14px" id="me-name">admin</strong><small id="me-role">Admin</small></span>
+        </div>
+        <button type="button" class="btn btn-outline" id="logout" style="border-radius:12px">
+          <svg class="i" width="16" height="16" aria-hidden="true"><use href="#i-logout"></use></svg>Log out
+        </button>
+      </div>
+    </aside>
+
+    <!-- admin.js renders the current view (from the URL hash) into here -->
+    <main class="content" id="view" aria-live="polite"></main>
+  </div>
+
+  <script src="assets/js/effects.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · Hiriq</title>
+  <meta name="theme-color" content="#05070D">
+  <link rel="icon" href="assets/img/logo-mark.png">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+  <script src="assets/js/icons.js"></script>
+  <div class="space-bg" data-stars="45" data-seed="11" aria-hidden="true"></div>
+
+  <div class="auth">
+    <main class="auth-main">
+      <a href="index.html" class="logo" aria-label="Hiriq home"><img src="assets/img/logo-full.png" alt="Hiriq"></a>
+
+      <div class="glow-border auth-card">
+        <div class="glow-inner">
+          <div class="field-group" style="gap:10px">
+            <h1 class="auth-title">Welcome <span class="grad-text">back.</span></h1>
+            <p class="auth-lead">Log in to pick up your matches, shortlists and dashboards.</p>
+          </div>
+
+          <button type="button" class="btn btn-ghost glass btn-google" data-google>
+            <svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-mail"></use></svg>Continue with Google
+          </button>
+          <div class="divider">or</div>
+
+          <div class="segmented" data-active="email" role="group" aria-label="Sign-in method">
+            <span class="thumb" aria-hidden="true"></span>
+            <button type="button" data-method="email" aria-pressed="true"><svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-mail"></use></svg>Email</button>
+            <button type="button" data-method="phone" aria-pressed="false"><svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-phone"></use></svg>Phone</button>
+          </div>
+
+          <!-- Email -->
+          <form class="form" id="email-form" novalidate>
+            <div class="field-group">
+              <label class="label" for="identifier">Email or username</label>
+              <input class="field" id="identifier" type="text" autocomplete="username" placeholder="you@company.com">
+            </div>
+            <div class="field-group">
+              <div class="label-row"><label class="label" for="password">Password</label><a href="forgot-password.html">Forgot password?</a></div>
+              <div class="pw">
+                <input class="field" id="password" type="password" autocomplete="current-password" placeholder="Enter your password">
+                <button type="button" data-toggle-pw="password" aria-label="Show password"><svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-eye"></use></svg></button>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-grad btn-block" id="login-btn">Log in</button>
+          </form>
+
+          <!-- Phone: number -->
+          <div class="form" id="phone-form" hidden>
+            <div class="field-group">
+              <label class="label" for="phone">Mobile number</label>
+              <div class="phone">
+                <select class="field" id="country" aria-label="Country code">
+                  <option value="+91">+91 IN</option><option value="+971">+971 AE</option><option value="+1">+1 US</option><option value="+44">+44 UK</option>
+                </select>
+                <input class="field" id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="98765 43210" data-phone>
+              </div>
+              <span class="hint">We will text you a 6-digit code. Standard SMS rates may apply.</span>
+            </div>
+            <button type="button" class="btn btn-grad btn-block" id="send-code">Send code <svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-arrow"></use></svg></button>
+          </div>
+
+          <!-- Phone: code -->
+          <form class="form" id="otp-form" novalidate hidden>
+            <div class="sent">
+              <span class="tick"><svg class="i" width="16" height="16" aria-hidden="true"><use href="#i-check"></use></svg></span>
+              <span>Code sent to <span id="sent-to"></span>. <button type="button" class="link-btn" id="change-number">Change number</button></span>
+            </div>
+            <div class="otp" id="otp"></div>
+            <button type="submit" class="btn btn-grad btn-block">Verify and log in</button>
+            <div class="resend" id="resend"></div>
+          </form>
+
+          <div id="login-message" aria-live="polite"></div>
+
+          <p class="switch-line">New to Hiriq? <a href="signup.html">Create an account</a></p>
+        </div>
+      </div>
+
+      <p class="auth-foot">Google sign-in shares only your name and email. Admin accounts are by invitation.</p>
+    </main>
+
+    <aside class="auth-aside">
+      <div class="aside-panel glass">
+        <div class="orbit" aria-hidden="true">
+          <div class="ring r1"><span></span></div>
+          <div class="ring r2"><span></span></div>
+          <div class="ring r3"><span></span></div>
+          <div class="core"></div>
+          <img src="assets/img/logo-mark.png" alt="">
+          <span class="chip glass f1" style="top:18px;left:-10px"><svg class="i" width="16" height="16"><use href="#i-check"></use></svg>Python matched</span>
+          <span class="chip glass f2 mono" style="top:40px;right:-4px">82 / 100</span>
+          <span class="chip glass f3" style="bottom:26px;right:-10px"><span class="dot pulse" style="background:rgb(var(--a3))"></span>Gap: dbt</span>
+          <span class="chip glass f4" style="bottom:40px;left:-4px"><span class="dot" style="background:rgb(var(--a2))"></span>Alert sent</span>
+        </div>
+        <div class="aside-copy center">
+          <span class="eyebrow">Morning job alerts</span>
+          <h2>The roles that fit you, <span class="grad-text">ranked with reasons.</span></h2>
+          <span class="faint" style="font-size:12px">Illustration uses sample data</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="assets/js/effects.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/auth-client.js"></script>
+  <script src="assets/js/auth.js"></script>
+</body>
+</html>
