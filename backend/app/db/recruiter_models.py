@@ -26,6 +26,7 @@ STAGES = ("sourced", "shortlisted", "interview", "offer", "hired")
 PIPELINE_STAGES = STAGES + ("rejected",)
 CANDIDATE_SOURCES = ("upload", "platform")
 EVENT_KINDS = ("job", "resume", "match", "pipeline")
+AI_PURPOSES = ("jd", "parse", "match", "ask", "other")
 STRONG_SCORE = 70  # a match at or above this counts as "strong" on the overview
 
 
@@ -176,4 +177,22 @@ class RecruiterEvent(Base):
     job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
     candidate_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("candidates.id", ondelete="SET NULL"))
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.false())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AiCall(Base):
+    """One call to the language model. Powers the admin AI-usage panel; no prompts or resume text are stored."""
+
+    __tablename__ = "ai_calls"
+    __table_args__ = (Index("ix_ai_calls_owner_purpose_created", "owner_id", "purpose", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigId, primary_key=True, autoincrement=True)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    purpose: Mapped[str] = mapped_column(String(20), nullable=False)   # one of AI_PURPOSES
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    error: Mapped[str | None] = mapped_column(String(200))             # short reason when ok is false
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

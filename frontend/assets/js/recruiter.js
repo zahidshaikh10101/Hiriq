@@ -1,6 +1,6 @@
 /* Hiriq — recruiter workspace. Live data from the backend (/api/recruiter/*).
-   Views are chosen by the URL hash: #overview #jobs #candidates #matching #pipeline #ask.
-   Only the overview exists in Phase 1; the others explain what is coming and show no made-up numbers. */
+   Views are chosen by the URL hash: #overview #jobs #jobs/new #jobs/<id> #candidates #matching #pipeline #pipeline/<job id> #ask.
+   Overview (phase 1), Jobs & JDs (2), Candidates (3), Matching (4), Pipeline (5) and Ask the pool (6) are live. */
 (function () {
   var view = document.getElementById("view");
   var cfg = window.HIRIQ_CONFIG;
@@ -50,6 +50,15 @@
 
   // A newer navigation cancels slower responses from an older one.
   var navId = 0;
+  var helpers = {
+    view: view, esc: esc, fmt: fmt, ago: ago, icon: icon, api: api, header: header, loading: loading, failure: failure,
+    nav: function () { return ++navId; }, current: function (id) { return id === navId; }
+  };
+  var jobs = window.HiriqJobs ? window.HiriqJobs(helpers) : null;
+  var candidates = window.HiriqCandidates ? window.HiriqCandidates(helpers) : null;
+  var matching = window.HiriqMatching ? window.HiriqMatching(helpers) : null;
+  var pipeline = window.HiriqPipeline ? window.HiriqPipeline(helpers) : null;
+  var ask = window.HiriqAsk ? window.HiriqAsk(helpers) : null;
 
   // =====================================================
   // OVERVIEW
@@ -147,7 +156,7 @@
     var parts = [];
     parts.push('<div class="todo"><div class="todo-head"><span>Candidates waiting for review</span><span class="mono">' + fmt(n.waiting_total) + "</span></div>" +
       (n.waiting.length
-        ? "<ul>" + n.waiting.map(function (w) { return "<li>" + esc(w.name) + " <small>for " + esc(w.job) + "</small></li>"; }).join("") + "</ul>"
+        ? "<ul>" + n.waiting.map(function (w) { return '<li><a href="#pipeline/' + esc(w.job_id) + '">' + esc(w.name) + "</a> <small>for " + esc(w.job) + "</small></li>"; }).join("") + "</ul>"
         : '<p class="empty-inline">Nothing waiting. You are all caught up.</p>') + "</div>");
     parts.push('<div class="todo"><div class="todo-head"><span>Jobs open over ' + n.stale_days + ' days</span><span class="mono">' + fmt(n.stale_jobs.length) + "</span></div>" +
       (n.stale_jobs.length
@@ -186,9 +195,9 @@
 
     var quick =
       '<div class="quick">' +
-      '<a class="btn btn-grad" href="#jobs">' + icon("plus", 16) + 'Create JD <span class="phase-tag">Phase 2</span></a>' +
-      '<a class="btn btn-ghost glass" href="#candidates">' + icon("upload", 16) + 'Upload resume <span class="phase-tag">Phase 3</span></a>' +
-      '<a class="btn btn-ghost glass" href="#matching">' + icon("search", 16) + 'Match candidates <span class="phase-tag">Phase 4</span></a></div>';
+      '<a class="btn btn-grad" href="#jobs/new">' + icon("plus", 16) + 'Create JD</a>' +
+      '<a class="btn btn-ghost glass" href="#candidates">' + icon("upload", 16) + 'Upload resume</a>' +
+      '<a class="btn btn-ghost glass" href="#matching">' + icon("search", 16) + 'Match candidates</a></div>';
 
     view.innerHTML =
       '<div class="view">' + header("Overview", D.has_demo ? SAMPLE : LIVE) +
@@ -196,7 +205,8 @@
       sample + start +
       '<div class="grid-auto" style="--min:170px">' + D.kpis.map(kpiCard).join("") + "</div>" +
       '<div class="row">' +
-        '<div class="card card-stack grow-2"><div class="stack-2"><h2 class="card-title">Hiring funnel</h2><span class="card-sub">Sourced to hired, across all your jobs</span></div>' + funnelCard(D.funnel) + "</div>" +
+        '<div class="card card-stack grow-2"><div class="row-between"><div class="stack-2"><h2 class="card-title">Hiring funnel</h2><span class="card-sub">Sourced to hired, across all your jobs</span></div>' +
+          '<a class="btn-link" href="#pipeline">Open pipeline</a></div>' + funnelCard(D.funnel) + "</div>" +
         '<div class="card card-stack grow-1"><div class="stack-2"><h2 class="card-title">Needs action</h2><span class="card-sub">What is waiting on you</span></div>' + needsCard(D.needs_action) + "</div>" +
       "</div>" +
       '<div class="row">' +
@@ -217,7 +227,7 @@
   }
 
   // =====================================================
-  // Modules that arrive in later phases: say so, show nothing invented
+  // A module that failed to load says so instead of showing a blank page
   // =====================================================
   function renderSoon(title, phase, lead, points) {
     ++navId;
@@ -225,36 +235,28 @@
       '<div class="card card-stack soon-card"><h2 class="card-title">Coming next</h2><p class="muted" style="margin:0">' + esc(lead) + "</p><ul>" +
       points.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul></div></div>";
   }
-  var SOON = {
-    jobs: ["Jobs & JDs", "Phase 2", "Create a job from a short form and let AI write the job description. You edit it, then publish or close the job.",
-      ["Preset form: role, experience, qualification, budget, skills, day-to-day work", "Generated JD you can edit before publishing", "Draft, open and closed jobs, plus clone and close"]],
-    candidates: ["Candidates", "Phase 3", "Upload resumes of people who are not on Hiriq and get a clean profile for each.",
-      ["Name, contact, LinkedIn and GitHub, experience, education, past employers, skills", "The same file uploaded twice is read once", "Candidates who joined Hiriq appear here too"]],
-    matching: ["Matching", "Phase 4", "Pick a job and see every candidate ranked, with the reasons behind each score.",
-      ["Weighted score you can adjust: skills, experience, location", "Semantic similarity on top of keywords", "Matched and missing skills, with the line from the resume as evidence"]],
-    pipeline: ["Pipeline", "Phase 5", "Move candidates from sourced to hired on a board, with notes.",
-      ["Stages: sourced, shortlisted, interview, offer, hired", "Thumbs up or down on a match, which teaches the ranker", "Rejection reasons, kept for your own records"]],
-    ask: ["Ask the pool", "Phase 6", "Ask a question in plain English and get candidates back with the resume lines that answer it.",
-      ["For example: who has fintech experience and used Airflow?", "Every answer cites its source", "Only searches resumes you are allowed to see"]]
-  };
-  function soon(key) { var s = SOON[key]; return function () { renderSoon(s[0], s[1], s[2], s[3]); }; }
 
   // =====================================================
   // Router
   // =====================================================
   var VIEWS = {
-    overview: [renderOverview, "Overview"], jobs: [soon("jobs"), "Jobs & JDs"], candidates: [soon("candidates"), "Candidates"],
-    matching: [soon("matching"), "Matching"], pipeline: [soon("pipeline"), "Pipeline"], ask: [soon("ask"), "Ask the pool"]
+    overview: [renderOverview, "Overview"],
+    jobs: [function (rest) { return !jobs ? renderSoon("Jobs & JDs", "Unavailable", "The jobs module did not load. Refresh the page.", []) : rest[0] ? jobs.edit(rest[0]) : jobs.list(); }, "Jobs & JDs"],
+    candidates: [function (rest) { return !candidates ? renderSoon("Candidates", "Unavailable", "The candidates module did not load. Refresh the page.", []) : rest[0] ? candidates.detail(rest[0]) : candidates.list(); }, "Candidates"],
+    matching: [function (rest) { return !matching ? renderSoon("Matching", "Unavailable", "The matching module did not load. Refresh the page.", []) : matching.show(rest[0] ? decodeURIComponent(rest[0]) : ""); }, "Matching"],
+    pipeline: [function (rest) { return !pipeline ? renderSoon("Pipeline", "Unavailable", "The pipeline module did not load. Refresh the page.", []) : pipeline.show(rest[0] ? decodeURIComponent(rest[0]) : ""); }, "Pipeline"],
+    ask: [function () { return !ask ? renderSoon("Ask the pool", "Unavailable", "The ask module did not load. Refresh the page.", []) : ask.show(); }, "Ask the pool"]
   };
   function route() {
-    var key = (location.hash || "#overview").slice(1);
+    var parts = (location.hash || "#overview").slice(1).split("/");
+    var key = parts[0];
     if (!VIEWS[key]) key = "overview";
     document.querySelectorAll(".side-nav a").forEach(function (a) {
       if (a.getAttribute("href") === "#" + key) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
     document.title = VIEWS[key][1] + " · Hiriq recruiter";
-    VIEWS[key][0]();
+    VIEWS[key][0](parts.slice(1));
     window.scrollTo(0, 0);
   }
 

@@ -1,0 +1,30 @@
+/* =========================================================
+   Ask the pool (phase 6): the question box, answers, sources, keyword matches
+   Loaded after recruiter.css on recruiter.html. Reuses its tokens (--a1..--a4, --warn, --bad, --ink).
+   ========================================================= */
+.ask-eg { cursor: pointer; border: 1px solid rgb(255 255 255 / 0.14); font: inherit; font-size: 12.5px; text-align: left; }
+.ask-eg:hover { border-color: rgb(var(--a1) / 0.6); background: rgb(var(--a1) / 0.1); }
+
+.ask-feed { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+.ask-item { display: flex; flex-direction: column; gap: 10px; }
+.ask-q { margin: 0; font-weight: 600; font-size: 15.5px; overflow-wrap: anywhere; }
+.ask-q .chip { margin-left: 6px; padding: 2px 8px; font-size: 11px; vertical-align: middle; }
+.ask-answer { margin: 0; font-size: 15px; line-height: 1.55; color: rgb(var(--ink) / 0.9); overflow-wrap: anywhere; }
+.ask-wait { margin: 0; display: flex; align-items: center; gap: 10px; color: rgb(var(--ink) / 0.7); font-size: 14px; }
+
+.ask-ref { font-weight: 600; color: rgb(var(--a1)); text-decoration: underline; text-underline-offset: 3px; }
+.ask-ref:hover { color: rgb(var(--a4)); }
+
+.ask-sources { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ask-sources li { display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; border-radius: 12px; border: 1px solid rgb(255 255 255 / 0.08); border-left: 4px solid rgb(var(--a4)); background: rgb(255 255 255 / 0.03); font-size: 14px; overflow-wrap: anywhere; }
+.ask-quote { font-size: 13px; font-style: italic; color: rgb(var(--ink) / 0.75); }
+.ask-quote.none { color: #ffe0ad; }
+
+.ask-matches { border-top: 1px solid rgb(255 255 255 / 0.08); padding-top: 8px; }
+.ask-matches summary { cursor: pointer; font-size: 13.5px; color: rgb(var(--ink) / 0.75); min-height: 32px; display: flex; align-items: center; }
+.ask-matches ol { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ask-matches li { display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.04); font-size: 14px; overflow-wrap: anywhere; }
+.ask-m-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ask-m-top .chip { padding: 2px 8px; font-size: 11px; }
+.ask-m-score { margin-left: auto; padding: 1px 8px; border-radius: 8px; border: 1px solid rgb(255 255 255 / 0.16); font-size: 12px; color: rgb(var(--ink) / 0.7); }
+.ask-snippet { font-size: 13px; color: rgb(var(--ink) / 0.7); }
