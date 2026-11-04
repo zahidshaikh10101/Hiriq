@@ -1,6 +1,9 @@
-"""Write the PostgreSQL DDL for the models to ../db/schema.sql (reference / manual runs in the Neon SQL editor).
+"""Write the PostgreSQL DDL for every model to ../db/schema.sql (reference / manual runs in the Neon SQL editor).
 
     python -m app.db.export_schema
+
+Both model files are imported, so the account tables (models.py) and the recruiter tables (recruiter_models.py)
+land in the file. Run it again whenever either file changes.
 """
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from pathlib import Path
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateIndex, CreateTable
 
-from app.db import models  # noqa: F401  (registers tables)
+from app.db import models, recruiter_models  # noqa: F401  (importing registers every table)
 from app.db.base import Base
 
 OUT = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
@@ -17,7 +20,7 @@ OUT = Path(__file__).resolve().parents[2] / "db" / "schema.sql"
 
 def build() -> str:
     dialect = postgresql.dialect()
-    parts = ["-- Hiriq schema (PostgreSQL). Generated from app/db/models.py; do not edit by hand.\n"]
+    parts = ["-- Hiriq schema (PostgreSQL). Generated from app/db/models.py and app/db/recruiter_models.py; do not edit by hand.\n"]
     for table in Base.metadata.sorted_tables:
         parts.append(str(CreateTable(table).compile(dialect=dialect)).strip() + ";\n")
         for index in sorted(table.indexes, key=lambda i: i.name or ""):

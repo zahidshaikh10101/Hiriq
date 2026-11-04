@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db import session as db_session
-from app.routers import admin, ask, auth, candidates, health, jobs, matches, pipeline, recruiter
+from app.routers import admin, admin_ai, ask, auth, candidates, health, jobs, matches, pipeline, recruiter
 
 log = logging.getLogger("hiriq")
 
@@ -51,6 +51,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(admin.router, prefix="/api/admin")
+app.include_router(admin_ai.router, prefix="/api/admin")
 app.include_router(recruiter.router, prefix="/api/recruiter")
 app.include_router(jobs.router, prefix="/api/recruiter")
 app.include_router(candidates.router, prefix="/api/recruiter")
@@ -62,7 +63,7 @@ app.include_router(ask.router, prefix="/api/recruiter")
 #   /api/recruiter - all recruiter routers are live (jobs, candidates, matcher, pipeline, ask-the-pool)
 #   /api/resumes   - candidate-side upload + structured extraction (GenAI)
 #   /api/match     - score a resume against a job, with explanation
-#   /api/admin     - users, sources, model metrics (users, overview and audit are live; AI usage in phase 7)
+#   /api/admin     - users, sources, model metrics (users, overview, audit and AI usage are live)
 
 # Serve the plain HTML/CSS/JS frontend from the same server, so one URL runs everything.
 # Mounted last so /api routes take priority.

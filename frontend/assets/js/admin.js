@@ -1,6 +1,6 @@
 /* Hiriq — admin console. Live data from the backend (/api/admin/*).
-   Views are chosen by the URL hash: #overview #users #jobs #model #audit.
-   Overview, Users and Audit read your real database. Jobs and Model quality have nothing to show yet. */
+   Views are chosen by the URL hash: #overview #users #ai #jobs #model #audit.
+   Overview, Users, AI usage and Audit read your real database. Jobs and Model quality have nothing to show yet. */
 (function () {
   var view = document.getElementById("view");
   var cfg = window.HIRIQ_CONFIG;
@@ -356,6 +356,19 @@
   }
 
   // =====================================================
+  // AI USAGE (the ai_calls log; see admin-ai.js)
+  // =====================================================
+  var ai = window.HiriqAdminAI ? window.HiriqAdminAI({
+    view: view, esc: esc, fmt: fmt, icon: icon, api: api, ago: ago, header: header, loading: loading, failure: failure, meter: meter,
+    barChart: barChart, wireBarChart: wireBarChart,
+    next: function () { return ++navId; }, current: function (id) { return id === navId; }
+  }) : null;
+  function renderAi() {
+    if (ai) ai.show();
+    else failure("AI usage", "The AI usage module did not load. Refresh the page.");
+  }
+
+  // =====================================================
   // JOBS & MODEL QUALITY: nothing real to show yet
   // =====================================================
   function renderNotBuilt(title, text) {
@@ -399,7 +412,7 @@
   // =====================================================
   // Router
   // =====================================================
-  var VIEWS = { overview: [renderOverview, "Overview"], users: [renderUsers, "Users & roles"], jobs: [renderJobs, "Jobs & sources"], model: [renderModel, "Model quality"], audit: [renderAudit, "Audit log"] };
+  var VIEWS = { overview: [renderOverview, "Overview"], users: [renderUsers, "Users & roles"], ai: [renderAi, "AI usage"], jobs: [renderJobs, "Jobs & sources"], model: [renderModel, "Model quality"], audit: [renderAudit, "Audit log"] };
   function route() {
     var key = (location.hash || "#overview").slice(1);
     if (!VIEWS[key]) key = "overview";

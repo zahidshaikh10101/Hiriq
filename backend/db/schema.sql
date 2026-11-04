@@ -1,4 +1,4 @@
--- Hiriq schema (PostgreSQL). Generated from app/db/models.py; do not edit by hand.
+-- Hiriq schema (PostgreSQL). Generated from app/db/models.py and app/db/recruiter_models.py; do not edit by hand.
 
 CREATE TABLE plans (
 	id VARCHAR(20) NOT NULL, 
@@ -19,6 +19,7 @@ CREATE TABLE users (
 	role VARCHAR(20) DEFAULT 'candidate' NOT NULL, 
 	status VARCHAR(20) DEFAULT 'active' NOT NULL, 
 	plan_id VARCHAR(20) DEFAULT 'free' NOT NULL, 
+	date_of_birth DATE, 
 	designation VARCHAR(120), 
 	company VARCHAR(120), 
 	job_alerts BOOLEAN DEFAULT true NOT NULL, 
@@ -73,6 +74,23 @@ CREATE TABLE admin_profiles (
 	FOREIGN KEY(invited_by) REFERENCES users (id) ON DELETE SET NULL
 );
 
+CREATE TABLE ai_calls (
+	id BIGSERIAL NOT NULL, 
+	owner_id UUID, 
+	purpose VARCHAR(20) NOT NULL, 
+	model VARCHAR(120) NOT NULL, 
+	ok BOOLEAN NOT NULL, 
+	error VARCHAR(200), 
+	latency_ms INTEGER, 
+	prompt_tokens INTEGER, 
+	completion_tokens INTEGER, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(owner_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_ai_calls_owner_purpose_created ON ai_calls (owner_id, purpose, created_at);
+
 CREATE TABLE audit_logs (
 	id BIGSERIAL NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
@@ -107,6 +125,69 @@ CREATE TABLE auth_identities (
 
 CREATE INDEX ix_auth_identities_user_id ON auth_identities (user_id);
 
+CREATE TABLE candidates (
+	id UUID NOT NULL, 
+	owner_id UUID, 
+	user_id UUID, 
+	source VARCHAR(10) DEFAULT 'upload' NOT NULL, 
+	full_name VARCHAR(160) NOT NULL, 
+	email VARCHAR(320), 
+	phone VARCHAR(30), 
+	location VARCHAR(160), 
+	linkedin_url VARCHAR(300), 
+	github_url VARCHAR(300), 
+	current_title VARCHAR(160), 
+	current_company VARCHAR(160), 
+	total_experience_years FLOAT, 
+	qualification VARCHAR(200), 
+	skills JSONB NOT NULL, 
+	profile JSONB, 
+	resume_text TEXT, 
+	file_name VARCHAR(255), 
+	file_hash VARCHAR(64), 
+	is_demo BOOLEAN DEFAULT false NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_candidates_source CHECK (source IN ('upload', 'platform')), 
+	CONSTRAINT uq_candidate_owner_filehash UNIQUE (owner_id, file_hash), 
+	FOREIGN KEY(owner_id) REFERENCES users (id) ON DELETE CASCADE, 
+	UNIQUE (user_id), 
+	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_candidates_owner_created ON candidates (owner_id, created_at);
+
+CREATE TABLE jobs (
+	id UUID NOT NULL, 
+	owner_id UUID NOT NULL, 
+	title VARCHAR(160) NOT NULL, 
+	department VARCHAR(120), 
+	location VARCHAR(120), 
+	work_mode VARCHAR(20), 
+	employment_type VARCHAR(30), 
+	experience_min INTEGER, 
+	experience_max INTEGER, 
+	qualification VARCHAR(200), 
+	salary_min INTEGER, 
+	salary_max INTEGER, 
+	salary_currency VARCHAR(3) DEFAULT 'INR' NOT NULL, 
+	skills_required JSONB NOT NULL, 
+	skills_nice JSONB NOT NULL, 
+	responsibilities TEXT, 
+	description TEXT, 
+	status VARCHAR(10) DEFAULT 'draft' NOT NULL, 
+	is_demo BOOLEAN DEFAULT false NOT NULL, 
+	opened_at TIMESTAMP WITH TIME ZONE, 
+	closed_at TIMESTAMP WITH TIME ZONE, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_jobs_status CHECK (status IN ('draft', 'open', 'closed')), 
+	FOREIGN KEY(owner_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_jobs_owner_status ON jobs (owner_id, status);
+
 CREATE TABLE otp_codes (
 	id UUID NOT NULL, 
 	purpose VARCHAR(20) NOT NULL, 
@@ -118,11 +199,80 @@ CREATE TABLE otp_codes (
 	consumed_at TIMESTAMP WITH TIME ZONE, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	PRIMARY KEY (id), 
-	CONSTRAINT ck_otp_purpose CHECK (purpose IN ('signup')), 
+	CONSTRAINT ck_otp_purpose CHECK (purpose IN ('signup', 'reset')), 
 	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 CREATE INDEX ix_otp_destination_created ON otp_codes (destination, created_at);
+
+CREATE TABLE job_matches (
+	id UUID NOT NULL, 
+	job_id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	score FLOAT NOT NULL, 
+	breakdown JSONB, 
+	explanation JSONB, 
+	model_version VARCHAR(40), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_match_job_candidate UNIQUE (job_id, candidate_id), 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE, 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_matches_job_score ON job_matches (job_id, score);
+
+CREATE TABLE match_feedback (
+	id UUID NOT NULL, 
+	job_id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	recruiter_id UUID NOT NULL, 
+	label INTEGER NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_feedback_label CHECK (label IN (-1, 1)), 
+	CONSTRAINT uq_feedback_once UNIQUE (job_id, candidate_id, recruiter_id), 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE, 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(recruiter_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE TABLE pipeline_entries (
+	id UUID NOT NULL, 
+	job_id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	stage VARCHAR(20) DEFAULT 'sourced' NOT NULL, 
+	reached INTEGER DEFAULT '0' NOT NULL, 
+	rejection_reason VARCHAR(200), 
+	note TEXT, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_pipeline_stage CHECK (stage IN ('sourced', 'shortlisted', 'interview', 'offer', 'hired', 'rejected')), 
+	CONSTRAINT uq_pipeline_job_candidate UNIQUE (job_id, candidate_id), 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE, 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_pipeline_job_stage ON pipeline_entries (job_id, stage);
+
+CREATE TABLE recruiter_events (
+	id BIGSERIAL NOT NULL, 
+	owner_id UUID NOT NULL, 
+	kind VARCHAR(20) NOT NULL, 
+	text TEXT NOT NULL, 
+	job_id UUID, 
+	candidate_id UUID, 
+	is_demo BOOLEAN DEFAULT false NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_recruiter_event_kind CHECK (kind IN ('job', 'resume', 'match', 'pipeline')), 
+	FOREIGN KEY(owner_id) REFERENCES users (id) ON DELETE CASCADE, 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE SET NULL, 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_recruiter_events_owner_created ON recruiter_events (owner_id, created_at);
 
 INSERT INTO plans (id, name, live) VALUES
   ('free','Free',true),('basic','Basic',false),('pro','Pro',false),('premium','Premium',false)

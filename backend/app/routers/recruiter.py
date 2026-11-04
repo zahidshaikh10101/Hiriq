@@ -19,6 +19,7 @@ from app.db.recruiter_models import (
     STAGES, STRONG_SCORE, Candidate, Job, JobMatch, PipelineEntry, RecruiterEvent,
 )
 from app.db.session import get_db
+from app.routers.candidates import _members_visible
 from app.services.timeutil import aware, now
 
 router = APIRouter(tags=["recruiter"])
@@ -42,8 +43,9 @@ def _iso(dt) -> str | None:
 
 
 def _pool_filter(actor: User):
-    """Candidates this recruiter may see: their own uploads plus platform candidates."""
-    return or_(Candidate.owner_id == actor.id, Candidate.source == "platform")
+    """Candidates this recruiter may see: their own uploads plus Hiriq members whose account is active and verified
+    (the same rule as the Candidates and Matching pages, so a suspended member never counts)."""
+    return or_(Candidate.owner_id == actor.id, _members_visible())
 
 
 def _norm(skill: str) -> str:
@@ -138,7 +140,8 @@ def overview(actor: User = Depends(require_recruiter), db: Session | None = Depe
             wanted[key] += 1
             shown_name.setdefault(key, str(raw).strip())
     skills = []
-    skill_rows = [s for (s,) in db.execute(select(Candidate.skills).where(_pool_filter(actor))).all() if s]
+    skill_rows = [s for (s,) in db.execute(
+        select(Candidate.skills).outerjoin(User, User.id == Candidate.user_id).where(_pool_filter(actor))).all() if s]
     if wanted:
         have: Counter = Counter()
         for cand_skills in skill_rows:
