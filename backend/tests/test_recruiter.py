@@ -33,7 +33,7 @@ def env(tmp_path, monkeypatch):
     return e
 
 
-def make_user(env, email, role="recruiter", name=None):
+def make_user(env, email, role="recruiter", name=None, visible=True):
     from app.db.models import User
 
     with env.session.SessionLocal() as db:
@@ -42,6 +42,11 @@ def make_user(env, email, role="recruiter", name=None):
         db.add(u)
         db.commit()
         uid = str(u.id)
+        if role == "candidate" and visible:   # members are hidden from recruiters until they opt in; these tests act as opted-in members
+            from app.db.recruiter_models import Candidate
+
+            db.add(Candidate(user_id=u.id, source="platform", full_name=u.full_name, skills=[], visible_to_recruiters=True))
+            db.commit()
     token = env.security.create_token(uid, role, "x" * 40, 8)
     return uid, {"Authorization": f"Bearer {token}"}
 
@@ -191,14 +196,14 @@ def test_a_recruiter_never_sees_another_recruiters_data(env):
     assert "secret" not in str(d) and "B Upload" not in str(d)
 
 
-def test_platform_candidates_are_visible_to_every_recruiter(env):
+def test_opted_in_platform_candidates_are_visible_to_every_recruiter(env):
     from app.db.recruiter_models import Candidate
 
     _, h = make_user(env, "r@example.com")
-    cand_user_id, _ = make_user(env, "member@example.com", role="candidate")
+    cand_user_id, _ = make_user(env, "member@example.com", role="candidate", visible=False)
     import uuid
 
-    add(env, Candidate(user_id=uuid.UUID(cand_user_id), source="platform", full_name="Platform Pat", skills=["SQL"]))
+    add(env, Candidate(user_id=uuid.UUID(cand_user_id), source="platform", full_name="Platform Pat", skills=["SQL"], visible_to_recruiters=True))
     d = overview(env, h)
     k = {x["key"]: x for x in d["kpis"]}
     assert k["pool"]["value"] == 1 and k["parsed"]["value"] == 0  # in the pool, but not an upload of theirs

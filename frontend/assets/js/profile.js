@@ -91,9 +91,9 @@
       }
       showUsername(res.me && res.me.username);
       var sess = window.HiriqAuth.current();
-      if (sess && sess.role === "recruiter") {
+      if (sess && (sess.role === "recruiter" || sess.role === "candidate")) {
         notify("good", "Profile saved" + (res.me && res.me.username ? ". Your username is " + res.me.username : "") + ". Taking you to your workspace…");
-        setTimeout(function () { window.location.href = "recruiter.html"; }, 2500);
+        setTimeout(function () { window.location.href = sess.role === "candidate" ? "candidate.html" : "recruiter.html"; }, 2500);
         return;
       }
       notify("good", "Profile saved" + (res.me && res.me.username ? ". Your username is " + res.me.username : "") + ". The candidate and recruiter dashboards come next.");

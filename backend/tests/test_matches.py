@@ -32,7 +32,7 @@ def env(tmp_path, monkeypatch):
     return e
 
 
-def make_user(env, email, role="recruiter", status="active", verified=True):
+def make_user(env, email, role="recruiter", status="active", verified=True, visible=True):
     from app.db.models import User
 
     with env.session.SessionLocal() as db:
@@ -40,6 +40,11 @@ def make_user(env, email, role="recruiter", status="active", verified=True):
         db.add(u)
         db.commit()
         uid = str(u.id)
+        if role == "candidate" and visible:   # members are hidden from recruiters until they opt in; these tests act as opted-in members
+            from app.db.recruiter_models import Candidate
+
+            db.add(Candidate(user_id=u.id, source="platform", full_name=u.full_name, skills=[], visible_to_recruiters=True))
+            db.commit()
     return uid, {"Authorization": f"Bearer {env.security.create_token(uid, role, 'x' * 40, 8)}"}
 
 

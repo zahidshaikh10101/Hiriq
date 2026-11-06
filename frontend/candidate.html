@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Candidate · Hiriq</title>
+  <meta name="theme-color" content="#05070D">
+  <link rel="icon" href="assets/img/logo-mark.png">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/recruiter.css">
+  <link rel="stylesheet" href="assets/css/candidate.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/auth-client.js"></script>
+</head>
+<body>
+  <script src="assets/js/icons.js"></script>
+  <!-- Only a signed-in candidate may stay on this page. Recruiters and admins go to their own workspaces. -->
+  <script>
+    (function () {
+      var cfg = window.HIRIQ_CONFIG;
+      var s = window.HiriqAuth.current();
+      if (s && s.role === "admin") { window.location.replace("admin.html"); return; }
+      if (s && s.role === "recruiter") { window.location.replace("recruiter.html"); return; }
+      if (!s || s.role !== "candidate") { window.location.replace("login.html"); return; }
+      if (s.mode === "api") {
+        fetch(cfg.apiBase + "/api/auth/me", { headers: { Authorization: "Bearer " + s.token } })
+          .then(function (res) { if (!res.ok) window.HiriqAuth.logout(); })
+          .catch(function () { /* backend offline: calls on the page will say so */ });
+      }
+    })();
+  </script>
+  <div class="space-bg" data-stars="40" data-seed="23" data-meteors="off" data-spotlight="off" aria-hidden="true"></div>
+
+  <div class="admin">
+    <aside class="sidebar glass">
+      <div class="sidebar-top">
+        <a href="index.html" class="logo" aria-label="Hiriq home"><img src="assets/img/logo-full.png" alt="Hiriq"></a>
+        <span class="role-tag cand-tag">Candidate</span>
+      </div>
+      <nav class="side-nav" aria-label="Candidate sections">
+        <a href="#profile">My profile</a>
+        <a href="#insights">Insights</a>
+        <a href="#jobs">Jobs &amp; match</a>
+      </nav>
+      <div class="side-bottom">
+        <div class="me card">
+          <span class="avatar lg" id="me-avatar">C</span>
+          <span class="cell-stack"><strong style="font-size:14px" id="me-name">Candidate</strong><small id="me-role">Candidate</small></span>
+        </div>
+        <button type="button" class="btn btn-outline" id="logout" style="border-radius:12px">
+          <svg class="i" width="16" height="16" aria-hidden="true"><use href="#i-logout"></use></svg>Log out
+        </button>
+      </div>
+    </aside>
+
+    <!-- candidate.js renders the current view (from the URL hash) into here -->
+    <main class="content" id="view" aria-live="polite"></main>
+  </div>
+
+  <script src="assets/js/effects.js"></script>
+  <script src="assets/js/candidate.js"></script>
+</body>
+</html>

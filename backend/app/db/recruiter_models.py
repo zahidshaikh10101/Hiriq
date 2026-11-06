@@ -98,6 +98,8 @@ class Candidate(Base):
     resume_text: Mapped[str | None] = mapped_column(Text)                       # extracted text, used for search (RAG) later
     file_name: Mapped[str | None] = mapped_column(String(255))
     file_hash: Mapped[str | None] = mapped_column(String(64))                   # SHA-256 of the file: re-uploads cost nothing
+    # Platform candidates only. A member shows up in recruiter pools only after choosing to (default: hidden).
+    visible_to_recruiters: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.false())
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.false())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -117,6 +119,26 @@ class JobMatch(Base):
     score: Mapped[float] = mapped_column(Float, nullable=False)       # 0 to 100
     breakdown: Mapped[dict | None] = mapped_column(Json)               # weighted parts: skills, experience, ...
     explanation: Mapped[dict | None] = mapped_column(Json)             # matched / missing skills, cited evidence
+    model_version: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class CandidateJobMatch(Base):
+    """How a candidate sees their own fit to an open job. Always scored with the default weights and never shown to recruiters
+    (a recruiter may change the weights per job, so the two scores for the same pair can differ)."""
+
+    __tablename__ = "candidate_job_matches"
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "job_id", name="uq_cmatch_candidate_job"),
+        Index("ix_cmatch_candidate_score", "candidate_id", "score"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)       # 0 to 100
+    breakdown: Mapped[dict | None] = mapped_column(Json)
+    explanation: Mapped[dict | None] = mapped_column(Json)             # also holds cand_sig and job_sig, to spot a stale score
     model_version: Mapped[str | None] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

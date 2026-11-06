@@ -12,8 +12,8 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
 | Method | Path | What |
 |---|---|---|
 | GET | `/api/health` | status, version, database state, Google and email configuration |
-| POST | `/api/auth/signup` | name, email, password, date of birth; emails a 6-digit code |
-| POST | `/api/auth/signup/resend`, `/signup/verify-email` | resend the code; verify it and sign in |
+| POST | `/api/auth/signup` | name, email, password, date of birth; emails a 6-digit code and returns a one-time `signup_token`. No account exists yet (the details wait in `pending_signups`) |
+| POST | `/api/auth/signup/resend`, `/signup/verify-email` | resend the code; verify with `{email, code, token}` (the token from `/signup`), which creates the account and signs in |
 | POST | `/api/auth/login` | email or username + password |
 | POST | `/api/auth/password/forgot`, `/password/reset` | emailed code, then a new password |
 | POST | `/api/auth/google` | sign in or sign up with a Google credential |
@@ -38,6 +38,19 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
 | PATCH, DELETE | `/jobs/{id}/pipeline/{candidate_id}` | move or annotate; take off the board |
 | PUT | `/jobs/{id}/matches/{candidate_id}/feedback` | thumbs up (1), down (-1) or clear (0) |
 | POST | `/ask` | question about the pool, answered from the resumes with checked quotes |
+
+**Candidate** (`/api/candidate`, candidate role)
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/me` | your profile, resume status and visibility |
+| POST, DELETE | `/resume` | upload your resume (raw body, name in `X-Filename`; 10 AI reads/hour); remove it and your scores |
+| PUT | `/profile` | correct what the reader got wrong |
+| PUT | `/visibility` | `{visible}`: let recruiters find you (off by default) |
+| GET | `/insights` | completeness, skills with evidence, experience, skills open jobs ask for |
+| GET | `/jobs`, `/jobs/{id}` | open jobs only (`?q=`), with your stored fit |
+| POST | `/jobs/match`, `/jobs/{id}/match` | score all open jobs / one job (rules only, standard weights) |
+| POST | `/match/paste` | `{text}`: match a pasted job description (15 AI reads/hour, not stored) |
 
 **Admin** (`/api/admin`, admin role)
 

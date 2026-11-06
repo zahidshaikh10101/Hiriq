@@ -7,7 +7,7 @@ signed-in recruiter.
     PUT    /candidates/{id}     correct what the reader got wrong (your own uploads only)
     DELETE /candidates/{id}     remove one of your uploads
 
-Scope: a recruiter sees their own uploads and Hiriq members, nobody else's uploads (someone else's id answers 404).
+Scope: a recruiter sees their own uploads and the Hiriq members who chose to be visible, nobody else's uploads (someone else's id answers 404).
 Members' contact details stay hidden for now: a member did not hand their email or phone to every recruiter.
 Re-uploading the same file costs nothing: the file hash finds the earlier row and no AI call is made.
 """
@@ -57,8 +57,9 @@ def _iso(dt) -> str | None:
 
 # ---------- who may see whom ----------
 def _members_visible():
-    """Platform candidates count only while their account is active and verified."""
-    return and_(Candidate.source == "platform", User.role == "candidate", User.status == "active", User.email_verified.is_(True))
+    """Platform candidates count only while their account is active and verified, and only if they chose to be visible."""
+    return and_(Candidate.source == "platform", Candidate.visible_to_recruiters.is_(True), User.role == "candidate",
+                User.status == "active", User.email_verified.is_(True))
 
 
 def _sync_members(db: Session) -> None:
@@ -88,7 +89,7 @@ def _find(db: Session, actor: User, candidate_id: str) -> Candidate:
         raise _err(404, "not_found", "That candidate does not exist.")
     if c.owner_id == actor.id:
         return c
-    if c.source == "platform" and c.user_id is not None:
+    if c.source == "platform" and c.user_id is not None and c.visible_to_recruiters:
         u = db.get(User, c.user_id)
         if u is not None and u.role == "candidate" and u.status == "active" and u.email_verified:
             return c

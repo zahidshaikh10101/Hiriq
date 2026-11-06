@@ -130,6 +130,7 @@
     if (res.role === "admin") { window.location.href = "admin.html"; return; }
     if (res.role === "recruiter" && !(res.needsProfile && justSignedUp)) { window.location.href = "recruiter.html"; return; }
     if (res.needsProfile && justSignedUp) { window.location.href = "complete-profile.html"; return; }
+    if (res.role === "candidate") { window.location.href = "candidate.html"; return; }
     notify(msgBox, "good", res.needsProfile
       ? "Signed in. Open complete-profile.html to add your date of birth (it creates your username) and your phone."
       : "Signed in. The candidate and recruiter dashboards come next.");

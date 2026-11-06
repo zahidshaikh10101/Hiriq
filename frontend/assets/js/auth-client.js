@@ -130,19 +130,24 @@
 
   function demoOnly() { return Promise.resolve({ ok: false, error: DEMO_MSG }); }
 
+  // Secret from POST /signup. It stays in this page only; verifying needs it together with the emailed code, so a sign-up
+  // someone else restarts for your email cannot be completed with your code.
+  var signupToken = "";
+
   function signup(f) {
     if (cfg.mode !== "api") return demoOnly();
     return post("/api/auth/signup", {
       name: f.name, email: f.email, dob: f.dob, phone: f.phone || "", password: f.password,
       role: f.role, alerts: !!f.alerts, consent: !!f.consent
     }).then(function (r) {
+      if (r.ok) signupToken = r.data.signup_token || "";
       return r.ok ? { ok: true, emailMasked: r.data.email_masked } : { ok: false, error: r.error, code: r.code };
     });
   }
 
   function verifyEmail(email, code) {
     if (cfg.mode !== "api") return demoOnly();
-    return post("/api/auth/signup/verify-email", { email: email, code: code }).then(function (r) {
+    return post("/api/auth/signup/verify-email", { email: email, code: code, token: signupToken }).then(function (r) {
       if (!r.ok) return { ok: false, error: r.error, code: r.code };
       saveFromLogin("", r.data);
       return { ok: true, role: r.data.role, needsPhone: !!r.data.needs_phone, needsProfile: !!r.data.needs_profile, username: r.data.username || "" };

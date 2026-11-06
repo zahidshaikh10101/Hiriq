@@ -32,7 +32,7 @@ def env(tmp_path, monkeypatch):
     return e
 
 
-def make_user(env, email, role="admin", status="active", verified=True, username=None):
+def make_user(env, email, role="admin", status="active", verified=True, username=None, visible=True):
     from app.db.models import User
 
     with env.session.SessionLocal() as db:
@@ -40,6 +40,11 @@ def make_user(env, email, role="admin", status="active", verified=True, username
         db.add(u)
         db.commit()
         uid = str(u.id)
+        if role == "candidate" and visible:   # members are hidden from recruiters until they opt in; these tests act as opted-in members
+            from app.db.recruiter_models import Candidate
+
+            db.add(Candidate(user_id=u.id, source="platform", full_name=u.full_name, skills=[], visible_to_recruiters=True))
+            db.commit()
     return uid, {"Authorization": f"Bearer {env.security.create_token(uid, role, 'x' * 40, 8)}"}
 
 
@@ -151,12 +156,12 @@ def test_overview_skills_ignore_suspended_and_unverified_members(env):
         db.add(Job(owner_id=uuid.UUID(rid), title="Analyst", status="open", skills_required=["SQL"], skills_nice=[]))
         db.add(Candidate(owner_id=uuid.UUID(rid), source="upload", full_name="Mine", skills=["SQL"], file_hash="h1"))
         db.commit()
-    ok, _ = make_user(env, "ok@example.com", role="candidate")
-    bad, _ = make_user(env, "bad@example.com", role="candidate", status="suspended")
-    new, _ = make_user(env, "new@example.com", role="candidate", verified=False)
+    ok, _ = make_user(env, "ok@example.com", role="candidate", visible=False)
+    bad, _ = make_user(env, "bad@example.com", role="candidate", status="suspended", visible=False)
+    new, _ = make_user(env, "new@example.com", role="candidate", verified=False, visible=False)
     with env.session.SessionLocal() as db:
         for uid, name in ((ok, "Ok"), (bad, "Bad"), (new, "New")):
-            db.add(Candidate(user_id=uuid.UUID(uid), source="platform", full_name=name, skills=["SQL"]))
+            db.add(Candidate(user_id=uuid.UUID(uid), source="platform", full_name=name, skills=["SQL"], visible_to_recruiters=True))
         db.commit()
     d = env.client.get("/api/recruiter/overview", headers=rh).json()
     assert d["skills_in_demand"] == [{"skill": "SQL", "jobs": 1, "candidates": 2}]                  # my upload + the one active, verified member

@@ -33,7 +33,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # run `python -m app.services.llm_check` and change LLM_MODELS in .env; no code change needed.
 # The first model is tried first. A large model reads resumes and keeps to the JSON format far more reliably than a 2.6B one,
 # so the big one leads and the small, fast one is the backup. Check these ids with llm_check: free ids change without notice.
-DEFAULT_MODELS = ["nvidia/nemotron-3-ultra-550b-a55b:free", "liquid/lfm-2.5-2.6b:free"]
+DEFAULT_MODELS = ["nvidia/nemotron-3-ultra-550b-a55b:free", "dots-studio/dots-3-note-preview:free"]
 
 
 class LLMError(Exception):

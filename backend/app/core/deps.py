@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: who is calling, and are they an admin or a recruiter."""
+"""Shared FastAPI dependencies: who is calling, and are they an admin, a recruiter or a candidate."""
 from __future__ import annotations
 
 import uuid
@@ -60,4 +60,11 @@ def require_recruiter(user: User = Depends(current_user)) -> User:
     """Recruiter data belongs to recruiters. Admins manage accounts from the admin console instead."""
     if user.role != "recruiter":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Recruiters only.")
+    return user
+
+
+def require_candidate(user: User = Depends(current_user)) -> User:
+    """The candidate workspace belongs to job seekers. Recruiters and admins have their own workspaces."""
+    if user.role != "candidate":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Candidates only.")
     return user

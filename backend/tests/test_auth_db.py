@@ -11,7 +11,7 @@ PHONE = "+919820011234"
 PW = "Correct-horse-9"
 
 RELOAD = [
-    "app.core.config", "app.db.session", "app.db.init_db", "app.services.emailer", "app.services.otp",
+    "app.core.config", "app.db.session", "app.db.init_db", "app.db.upgrade", "app.services.emailer", "app.services.otp",
     "app.services.google_auth", "app.core.deps", "app.routers.health", "app.routers.auth", "app.routers.admin", "app.main",
 ]
 
@@ -37,6 +37,7 @@ def env(tmp_path, monkeypatch):
     e.session = mods["app.db.session"]
     mods["app.db.init_db"].init_db()
     e.codes = {}
+    e.tokens = {}
     monkeypatch.setattr(e.auth, "send_otp_email", lambda to, code, purpose="signup": e.codes.__setitem__(to, code))
     e.google = {"sub": "g-1", "email": EMAIL, "name": "Ann Lee"}
     monkeypatch.setattr(e.auth, "verify_google_credential", lambda cred: dict(e.google))
@@ -44,15 +45,26 @@ def env(tmp_path, monkeypatch):
     return e
 
 
+def verify(e, email=EMAIL, code=None, token=None):
+    """Verify the sign-up. By default uses the code emailed last and the token the last POST /signup returned."""
+    return e.client.post("/api/auth/signup/verify-email", json={
+        "email": email, "code": e.codes[email] if code is None else code,
+        "token": e.tokens.get(email, "") if token is None else token,
+    })
+
+
 def signup(e, email=EMAIL, password=PW, **kw):
     body = {"name": "Ann Lee", "email": email, "password": password, "role": "candidate", "consent": True, "dob": "2001-01-10"}
     body.update(kw)
-    return e.client.post("/api/auth/signup", json=body)
+    r = e.client.post("/api/auth/signup", json=body)
+    if r.status_code == 200:
+        e.tokens[email] = r.json()["signup_token"]
+    return r
 
 
 def complete_signup(e, email=EMAIL, **kw):
     assert signup(e, email=email, **kw).status_code == 200
-    r = e.client.post("/api/auth/signup/verify-email", json={"email": email, "code": e.codes[email]})
+    r = verify(e, email)
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -91,10 +103,13 @@ def test_signup_validation(env):
     assert signup(env, phone="9820011234").json()["detail"]["code"] == "bad_phone"
 
 
-def test_cannot_log_in_before_verifying_email(env):
+def test_signup_creates_no_account_until_the_code_is_verified(env):
     assert signup(env).status_code == 200
+    assert user_row(env, email=EMAIL) is None
     r = env.client.post("/api/auth/login", json={"username": EMAIL, "password": PW})
-    assert r.status_code == 403 and r.json()["detail"]["code"] == "not_verified"
+    assert r.status_code == 401  # no account yet, so it looks like any wrong password
+    assert verify(env).status_code == 200
+    assert user_row(env, email=EMAIL).email_verified is True
 
 
 def test_wrong_code_attempts_are_limited(env):
@@ -102,8 +117,8 @@ def test_wrong_code_attempts_are_limited(env):
     good = env.codes[EMAIL]
     wrong = "000000" if good != "000000" else "111111"
     for _ in range(3):
-        assert env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": wrong}).status_code == 400
-    r = env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": good})
+        assert verify(env, code=wrong).status_code == 400
+    r = verify(env, code=good)
     assert r.status_code == 429  # locked out even with the right code
 
 
@@ -115,7 +130,7 @@ def test_expired_code_rejected(env):
     with env.session.SessionLocal() as db:
         db.execute(update(OtpCode).values(expires_at=now() - timedelta(seconds=1)))
         db.commit()
-    r = env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": env.codes[EMAIL]})
+    r = verify(env)
     assert r.status_code == 400 and "expired" in r.json()["detail"]["message"]
 
 
@@ -126,8 +141,8 @@ def test_resend_issues_a_fresh_code_and_old_one_stops_working(env):
     assert env.client.post("/api/auth/signup/resend", json={"email": EMAIL}).status_code == 200
     new = env.codes[EMAIL]
     if new != old:
-        assert env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": old}).status_code == 400
-    assert env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": new}).status_code == 200
+        assert verify(env, code=old).status_code == 400
+    assert verify(env, code=new).status_code == 200
 
 
 def test_resend_for_unknown_email_reveals_nothing(env):
@@ -135,12 +150,69 @@ def test_resend_for_unknown_email_reveals_nothing(env):
     assert r.status_code == 200 and "ghost@example.com" not in env.codes
 
 
-def test_unverified_signup_can_be_restarted_but_verified_cannot_be_taken(env):
-    assert signup(env).status_code == 200
-    assert signup(env, password="Another-pass-1").status_code == 200  # abandoned signup restarted
+def test_verified_account_cannot_be_taken_by_a_new_signup(env):
     complete_signup(env)
-    r = signup(env)
+    r = signup(env, password="Another-pass-1")
     assert r.status_code == 409 and r.json()["detail"]["code"] == "account_exists"
+
+
+def test_restarted_signup_cannot_be_finished_with_the_victims_code(env):
+    # The victim signs up honestly; an attacker then restarts the same email with their own password.
+    assert signup(env, password="Victim-pass-1").status_code == 200
+    victim_token = env.tokens[EMAIL]
+    assert signup(env, password="Attacker-pass-1").status_code == 200
+    attacker_token = env.tokens[EMAIL]
+    assert victim_token != attacker_token
+    code = env.codes[EMAIL]  # the attacker never sees this: it goes to the real owner's inbox
+    # the owner enters the emailed code with the token their own browser holds -> refused
+    r = verify(env, code=code, token=victim_token)
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "signup_restarted"
+    # the attacker has the token but not the code -> refused, and no account exists
+    r = verify(env, code="000000" if code != "000000" else "111111", token=attacker_token)
+    assert r.status_code == 400
+    assert user_row(env, email=EMAIL) is None
+
+
+def test_signup_without_the_token_is_refused_even_with_the_right_code(env):
+    signup(env)
+    assert verify(env, token="").status_code == 400
+    assert verify(env, token="not-the-token").status_code == 400
+    assert user_row(env, email=EMAIL) is None
+    assert verify(env).status_code == 200  # the right pair still works afterwards (wrong tokens spent no attempts)
+
+
+def test_restarting_your_own_signup_uses_the_newest_password_and_token(env):
+    signup(env, password="First-pass-123")
+    signup(env, password="Second-pass-123")
+    assert verify(env).status_code == 200
+    ok = env.client.post("/api/auth/login", json={"username": EMAIL, "password": "Second-pass-123"})
+    assert ok.status_code == 200
+    assert env.client.post("/api/auth/login", json={"username": EMAIL, "password": "First-pass-123"}).status_code == 401
+
+
+def test_expired_pending_signup_cannot_be_verified(env):
+    from sqlalchemy import update
+    from app.db.models import PendingSignup
+    from app.services.timeutil import now
+    signup(env)
+    with env.session.SessionLocal() as db:
+        db.execute(update(PendingSignup).values(expires_at=now() - timedelta(seconds=1)))
+        db.commit()
+    assert verify(env).status_code == 400
+    assert user_row(env, email=EMAIL) is None
+
+
+def test_upgrade_removes_old_unverified_signups_but_keeps_real_accounts(env):
+    from app.db.models import User
+    from app.services.timeutil import now
+    complete_signup(env, email="real@example.com")
+    with env.session.SessionLocal() as db:   # what the old code left behind: a password-bearing, never-verified user
+        db.add(User(email="ghost@example.com", full_name="Ghost", password_hash="x", role="candidate", email_verified=False))
+        db.commit()
+    changes = env.mods["app.db.upgrade"].upgrade()
+    assert any("unverified" in c for c in changes)
+    assert user_row(env, email="ghost@example.com") is None
+    assert user_row(env, email="real@example.com") is not None
 
 
 def test_password_login_and_lockout(env):
@@ -184,13 +256,14 @@ def test_google_never_creates_admin(env):
     assert r.status_code == 422
 
 
-def test_google_link_wipes_unverified_signup_password(env):
-    # attacker signs up with the victim's email (never verifies), victim then uses Google
+def test_pending_signup_cannot_take_over_an_account_made_with_google(env):
+    # attacker starts a sign-up with the victim's email, then the victim uses Google
     assert signup(env).status_code == 200
-    r = env.client.post("/api/auth/google", json={"credential": "t", "mode": "login"})
+    r = env.client.post("/api/auth/google", json={"credential": "t", "mode": "signup", "consent": True})
     assert r.status_code == 200
     u = user_row(env, email=EMAIL)
     assert u.password_hash is None and u.email_verified is True
+    assert verify(env).status_code == 409  # the waiting sign-up can no longer become an account
     assert env.client.post("/api/auth/login", json={"username": EMAIL, "password": PW}).status_code == 401
 
 
@@ -371,7 +444,7 @@ def test_a_reset_code_cannot_finish_a_signup(env):
     complete_signup(env, email="c@example.com")
     env.codes.clear()
     ask_reset(env, "c@example.com")
-    r = env.client.post("/api/auth/signup/verify-email", json={"email": "c@example.com", "code": env.codes["c@example.com"]})
+    r = verify(env, "c@example.com")  # a reset code, and the account already exists
     assert r.status_code == 400
 
 

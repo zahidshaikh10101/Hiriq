@@ -126,6 +126,32 @@ class OtpCode(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class PendingSignup(Base):
+    """A sign-up that has not been verified yet. No `users` row exists until the emailed code is entered.
+
+    The password is kept only as an argon2 hash. `token_hash` binds the sign-up to the browser that started it: the browser
+    gets the secret token once, and verifying needs both that token and the emailed code. Someone who restarts a sign-up
+    for another person's email cannot read that person's code, and the person cannot guess the new token, so nobody can
+    end up verifying an account whose password they did not choose.
+    """
+
+    __tablename__ = "pending_signups"
+    __table_args__ = (CheckConstraint(_in("role", ("candidate", "recruiter")), name="ck_pending_role"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
+    phone_e164: Mapped[str | None] = mapped_column(String(20))
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    job_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.false())
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class AdminProfile(Base):
     """Extra admin-only data. A user is an admin when users.role = 'admin'; this row says what they may do."""
 

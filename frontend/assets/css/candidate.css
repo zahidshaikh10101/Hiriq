@@ -1,0 +1,68 @@
+/* =========================================================
+   Hiriq — candidate workspace (candidate.html)
+   Builds on admin.css and recruiter.css (layout, cards, chips, dropzone, buttons). Only what is new lives here.
+   ========================================================= */
+
+.cand-tag {
+  border-color: rgb(var(--a3) / 0.5);
+  background: rgb(var(--a3) / 0.16);
+  color: #d6d0ff;
+}
+
+/* Profile completeness */
+.progress { height: 10px; border-radius: 999px; background: rgb(255 255 255 / 0.08); overflow: hidden; }
+.progress > span { display: block; height: 100%; border-radius: inherit; background: var(--grad); transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.checklist { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.checklist li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.04); font-size: 13.5px; }
+.checklist .tick { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; border: 1.5px solid rgb(255 255 255 / 0.25); display: inline-flex; align-items: center; justify-content: center; }
+.checklist .done .tick { border-color: rgb(var(--a4)); background: rgb(var(--a4) / 0.2); color: rgb(var(--a4)); }
+.checklist small { display: block; color: rgb(var(--ink) / 0.55); }
+
+/* Visibility switch */
+.switch-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.switch { position: relative; width: 52px; height: 30px; flex-shrink: 0; border-radius: 999px; border: 1.5px solid rgb(255 255 255 / 0.25); background: rgb(255 255 255 / 0.08); cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; }
+.switch[aria-checked="true"] { background: rgb(var(--a4) / 0.35); border-color: rgb(var(--a4)); }
+.switch[aria-checked="true"]::after { transform: translateX(22px); }
+.switch:focus-visible { outline: 3px solid rgb(var(--a1) / 0.5); outline-offset: 2px; }
+.switch:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Skills with evidence */
+.skill-rows { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.skill-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 14px; border-radius: 14px; background: rgb(255 255 255 / 0.04); border: 1px solid rgb(255 255 255 / 0.07); font-size: 14px; }
+.skill-row .skill-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.skill-row blockquote { margin: 0; padding-left: 10px; border-left: 2px solid rgb(var(--a1) / 0.5); font-size: 12.5px; color: rgb(var(--ink) / 0.65); overflow-wrap: anywhere; }
+.status-chip { flex-shrink: 0; padding: 2px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid rgb(255 255 255 / 0.18); background: rgb(255 255 255 / 0.06); white-space: nowrap; }
+.status-chip.good { border-color: rgb(var(--a4) / 0.55); background: rgb(var(--a4) / 0.16); color: #b6f7e0; }
+.status-chip.near { border-color: rgb(var(--warn) / 0.5); background: rgb(var(--warn) / 0.14); color: #ffe0ad; }
+.status-chip.miss { border-color: rgb(var(--bad) / 0.5); background: rgb(var(--bad) / 0.14); color: #ffc2cc; }
+
+/* Fit score */
+.fit-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+.fit-score { width: 96px; height: 96px; flex-shrink: 0; border-radius: 50%; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 30px; font-weight: 700; border: 3px solid rgb(var(--a1) / 0.6); background: rgb(var(--a1) / 0.1); }
+.fit-score small { font-size: 11px; font-weight: 500; color: rgb(var(--ink) / 0.6); }
+.fit-score.strong { border-color: rgb(var(--a4)); background: rgb(var(--a4) / 0.14); }
+.fit-score.low { border-color: rgb(var(--warn) / 0.7); background: rgb(var(--warn) / 0.1); }
+.fit-text { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 6px; }
+.parts { display: flex; flex-direction: column; gap: 10px; }
+.part { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.part-top { display: flex; justify-content: space-between; gap: 10px; }
+.part .bar { height: 7px; border-radius: 999px; background: rgb(255 255 255 / 0.08); overflow: hidden; }
+.part .bar > span { display: block; height: 100%; border-radius: inherit; background: rgb(var(--a1)); }
+.part.off .bar > span { background: transparent; }
+.part small { color: rgb(var(--ink) / 0.6); }
+
+/* Job cards */
+.job-list { display: flex; flex-direction: column; gap: 12px; }
+.job-card { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.job-card h3 { margin: 0; font-size: 17px; }
+.job-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: rgb(var(--ink) / 0.65); }
+.job-card .fit-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.stale-note { font-size: 12px; color: rgb(var(--warn)); }
+
+.paste-box { min-height: 140px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.toolbar .field { flex: 1; min-width: 200px; max-width: 360px; }
+.employer { padding: 9px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.04); font-size: 14px; }
+.employer small { color: rgb(var(--ink) / 0.55); }
+.privacy-note { font-size: 12.5px; color: rgb(var(--ink) / 0.6); margin: 0; }

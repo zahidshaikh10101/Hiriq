@@ -6,21 +6,24 @@ A phone number is an optional profile field (PUT /profile); it is not verified, 
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import re
+import secrets
 from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import current_user, user_from_authorization
 from app.core.security import create_token, hash_password, same_secret, verify_password, verify_token
-from app.db.models import AuthIdentity, User
+from app.db.models import AuthIdentity, PendingSignup, User
 from app.db.session import get_db
 from app.services import audit, otp
 from app.services.username import assign_username
@@ -88,6 +91,12 @@ class EmailCodeIn(BaseModel):
     code: str
 
 
+class SignupVerifyIn(BaseModel):
+    email: str
+    code: str
+    token: str = ""  # the secret returned by POST /signup to the browser that started this sign-up
+
+
 class GoogleIn(BaseModel):
     credential: str
     mode: Literal["login", "signup"] = "login"
@@ -113,6 +122,7 @@ class CodeSent(BaseModel):
     status: str = "code_sent"
     email_masked: str | None = None
     resend_in: int | None = None
+    signup_token: str | None = None  # only POST /signup returns it; keep it in the browser and send it back with the code
 
 
 # ---------------- helpers ----------------
@@ -175,8 +185,15 @@ def _mark_signed_in(user: User) -> None:
     user.last_login_at = now()
 
 
-def _send_code(db: Session, email: str, user_id) -> None:
-    """Create + email a code. Any failure rolls the whole request back so nothing half-saved remains."""
+PENDING_SIGNUP_HOURS = 24
+
+
+def _token_hash(token: str) -> str:
+    return hmac.new(settings.session_secret.encode(), f"signup-token:{token}".encode(), hashlib.sha256).hexdigest()
+
+
+def _send_code(db: Session, email: str, user_id=None) -> None:
+    """Create + email a sign-up code. Any failure rolls the whole request back so nothing half-saved remains."""
     try:
         code = otp.issue(db, email, "signup", user_id)
         send_otp_email(email, code)
@@ -206,10 +223,11 @@ def _me(user: User) -> Me:
 # ---------------- sign up (email + password, then an emailed code) ----------------
 @router.post("/signup", response_model=CodeSent)
 def signup(body: SignupIn, request: Request, db: Session | None = Depends(get_db)) -> CodeSent:
+    """Step 1. Nothing is written to `users` here: the details wait in `pending_signups` until the emailed code is entered."""
     db = _need_db(db)
     name = body.name.strip()
     email = _email(body.email)
-    if len(name) < 2:
+    if len(name) < 2 or len(name) > 120:
         raise _err(422, "bad_name", "Add your full name.")
     if len(body.password) < 8 or len(body.password) > 128:
         raise _err(422, "weak_password", "Use a password of 8 to 128 characters.")
@@ -218,57 +236,77 @@ def signup(body: SignupIn, request: Request, db: Session | None = Depends(get_db
     dob = _dob(body.dob)
     phone = _phone(body.phone) if body.phone.strip() else None
 
-    user = db.scalar(select(User).where(User.email == email))
-    # A half-finished signup (email never verified) can be restarted; a real account cannot be taken over.
-    if user and (user.email_verified or user.identities or user.role == "admin"):
+    if db.scalar(select(User.id).where(User.email == email)):
         raise _err(409, "account_exists", "An account with this email already exists. Log in instead.")
 
-    if user is None:
-        user = User(email=email, full_name=name)
-        db.add(user)
-    user.full_name = name
-    user.date_of_birth = dob
-    user.phone_e164 = phone
-    user.password_hash = hash_password(body.password)
-    user.role = body.role
-    user.job_alerts = body.alerts if body.role == "candidate" else False
-    user.consented_at = now()
+    t = now()
+    db.execute(delete(PendingSignup).where(PendingSignup.expires_at < t))  # tidy abandoned sign-ups
+    token = secrets.token_urlsafe(32)
+    pending = db.scalar(select(PendingSignup).where(PendingSignup.email == email))
+    if pending is None:
+        pending = PendingSignup(email=email)
+        db.add(pending)
+    # Starting again replaces the earlier attempt AND its token, so only the latest browser can finish it.
+    pending.full_name = name
+    pending.date_of_birth = dob
+    pending.phone_e164 = phone
+    pending.password_hash = hash_password(body.password)
+    pending.role = body.role
+    pending.job_alerts = body.alerts if body.role == "candidate" else False
+    pending.token_hash = _token_hash(token)
+    pending.consented_at = t
+    pending.expires_at = t + timedelta(hours=PENDING_SIGNUP_HOURS)
     try:
         db.flush()
     except IntegrityError:
-        db.rollback()
-        raise _err(409, "account_exists", "An account with this email already exists. Log in instead.") from None
+        db.rollback()  # two requests for the same new email raced
+        raise _err(409, "signup_busy", "A sign-up for this email is already in progress. Try again in a moment.") from None
 
-    _send_code(db, email, user.id)
-    audit.record(db, "Auth", "started sign-up", actor_id=user.id, actor_label=name, target_user_id=user.id, ip=_ip(request))
+    _send_code(db, email)
+    audit.record(db, "Auth", "started sign-up", actor_label=name, ip=_ip(request))
     db.commit()
-    return CodeSent(email_masked=mask_email(email), resend_in=settings.otp_resend_seconds)
+    return CodeSent(email_masked=mask_email(email), resend_in=settings.otp_resend_seconds, signup_token=token)
 
 
 @router.post("/signup/resend", response_model=CodeSent)
 def signup_resend(body: EmailIn, db: Session | None = Depends(get_db)) -> CodeSent:
     db = _need_db(db)
     email = _email(body.email)
-    user = db.scalar(select(User).where(User.email == email, User.email_verified.is_(False)))
-    if user and user.password_hash:  # same reply whether or not there is a pending signup
-        _send_code(db, email, user.id)
+    pending = db.scalar(select(PendingSignup).where(PendingSignup.email == email))
+    if pending and aware(pending.expires_at) > now():  # same reply whether or not there is a pending signup
+        _send_code(db, email)
         db.commit()
     return CodeSent(email_masked=mask_email(email), resend_in=settings.otp_resend_seconds)
 
 
 @router.post("/signup/verify-email", response_model=LoginOut, response_model_exclude_none=True)
-def signup_verify(body: EmailCodeIn, request: Request, db: Session | None = Depends(get_db)) -> LoginOut:
+def signup_verify(body: SignupVerifyIn, request: Request, db: Session | None = Depends(get_db)) -> LoginOut:
+    """Step 2. Needs the emailed code AND the token from step 1; only then does the account come into being."""
     db = _need_db(db)
     email = _email(body.email)
+    pending = db.scalar(select(PendingSignup).where(PendingSignup.email == email))
+    # The token is checked before the code so a stranger cannot even spend the code's attempts.
+    if pending is None or aware(pending.expires_at) < now() or not body.token or not hmac.compare_digest(
+        pending.token_hash, _token_hash(body.token)
+    ):
+        raise _err(400, "signup_restarted", "This sign-up is no longer valid, or was started from another browser. Start sign-up again.")
     try:
-        row = otp.verify(db, email, "signup", body.code)
+        otp.verify(db, email, "signup", body.code)
     except otp.OtpError as exc:
         raise _err(exc.status, "otp_invalid", exc.message) from None
-    user = db.get(User, row.user_id) if row.user_id else None
-    if user is None or user.email != email:
-        db.rollback()
-        raise _err(400, "otp_invalid", "That code is no longer valid. Start sign-up again.")
-    user.email_verified = True
+
+    user = User(
+        email=email, full_name=pending.full_name, date_of_birth=pending.date_of_birth, phone_e164=pending.phone_e164,
+        password_hash=pending.password_hash, role=pending.role, job_alerts=pending.job_alerts,
+        consented_at=pending.consented_at, email_verified=True,
+    )
+    db.add(user)
+    db.delete(pending)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()  # the email became an account (for example through Google) while this sign-up waited
+        raise _err(409, "account_exists", "An account with this email already exists. Log in instead.") from None
     assign_username(db, user)
     _mark_signed_in(user)
     audit.record(db, "Auth", "verified their email and signed up", actor_id=user.id, actor_label=user.full_name,

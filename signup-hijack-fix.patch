@@ -1,0 +1,528 @@
+diff --git a/backend/README.md b/backend/README.md
+index 2d84ded..d06e313 100644
+--- a/backend/README.md
++++ b/backend/README.md
+@@ -12,8 +12,8 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
+ | Method | Path | What |
+ |---|---|---|
+ | GET | `/api/health` | status, version, database state, Google and email configuration |
+-| POST | `/api/auth/signup` | name, email, password, date of birth; emails a 6-digit code |
+-| POST | `/api/auth/signup/resend`, `/signup/verify-email` | resend the code; verify it and sign in |
++| POST | `/api/auth/signup` | name, email, password, date of birth; emails a 6-digit code and returns a one-time `signup_token`. No account exists yet (the details wait in `pending_signups`) |
++| POST | `/api/auth/signup/resend`, `/signup/verify-email` | resend the code; verify with `{email, code, token}` (the token from `/signup`), which creates the account and signs in |
+ | POST | `/api/auth/login` | email or username + password |
+ | POST | `/api/auth/password/forgot`, `/password/reset` | emailed code, then a new password |
+ | POST | `/api/auth/google` | sign in or sign up with a Google credential |
+diff --git a/backend/app/db/models.py b/backend/app/db/models.py
+index cb8840b..ad4f2a0 100644
+--- a/backend/app/db/models.py
++++ b/backend/app/db/models.py
+@@ -126,6 +126,32 @@ class OtpCode(Base):
+     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+ 
+ 
++class PendingSignup(Base):
++    """A sign-up that has not been verified yet. No `users` row exists until the emailed code is entered.
++
++    The password is kept only as an argon2 hash. `token_hash` binds the sign-up to the browser that started it: the browser
++    gets the secret token once, and verifying needs both that token and the emailed code. Someone who restarts a sign-up
++    for another person's email cannot read that person's code, and the person cannot guess the new token, so nobody can
++    end up verifying an account whose password they did not choose.
++    """
++
++    __tablename__ = "pending_signups"
++    __table_args__ = (CheckConstraint(_in("role", ("candidate", "recruiter")), name="ck_pending_role"),)
++
++    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
++    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
++    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
++    date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
++    phone_e164: Mapped[str | None] = mapped_column(String(20))
++    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
++    role: Mapped[str] = mapped_column(String(20), nullable=False)
++    job_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.false())
++    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
++    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
++    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
++    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
++
++
+ class AdminProfile(Base):
+     """Extra admin-only data. A user is an admin when users.role = 'admin'; this row says what they may do."""
+ 
+diff --git a/backend/app/db/upgrade.py b/backend/app/db/upgrade.py
+index e41b081..83685a0 100644
+--- a/backend/app/db/upgrade.py
++++ b/backend/app/db/upgrade.py
+@@ -6,6 +6,9 @@ The API also runs this once when it starts, so a new column or rule never leaves
+ What it does today:
+  - users.date_of_birth and users.tokens_valid_after (new columns)
+  - otp_codes accepts the purpose 'reset' (forgot password) as well as 'signup'
++ - pending_signups (new table): an unverified sign-up now waits there instead of in `users`
++   Old half-finished sign-ups left in `users` (never verified, no Google link, never signed in) are removed, because
++   their password could have been set by someone other than the email's owner.
+ Your users, admins and audit log are never touched.
+ """
+ from __future__ import annotations
+@@ -34,6 +37,13 @@ def upgrade() -> list[str]:
+             conn.execute(text("ALTER TABLE users ADD COLUMN tokens_valid_after TIMESTAMP WITH TIME ZONE"))
+             done.append("added users.tokens_valid_after")
+ 
++        stale = conn.execute(text(
++            "DELETE FROM users WHERE email_verified = :no AND password_hash IS NOT NULL AND role <> 'admin' "
++            "AND last_login_at IS NULL AND id NOT IN (SELECT user_id FROM auth_identities)"
++        ), {"no": False}).rowcount
++        if stale:
++            done.append(f"removed {stale} unverified half-finished sign-up(s) from users")
++
+         if engine.dialect.name == "postgresql":
+             rows = conn.execute(text(
+                 "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint "
+diff --git a/backend/app/routers/auth.py b/backend/app/routers/auth.py
+index fe87ef8..19eec88 100644
+--- a/backend/app/routers/auth.py
++++ b/backend/app/routers/auth.py
+@@ -6,21 +6,24 @@ A phone number is an optional profile field (PUT /profile); it is not verified,
+ """
+ from __future__ import annotations
+ 
++import hashlib
++import hmac
+ import logging
+ import re
++import secrets
+ from datetime import date, timedelta
+ from typing import Literal
+ 
+ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+ from pydantic import BaseModel
+-from sqlalchemy import or_, select
++from sqlalchemy import delete, or_, select
+ from sqlalchemy.exc import IntegrityError
+ from sqlalchemy.orm import Session
+ 
+ from app.core.config import settings
+ from app.core.deps import current_user, user_from_authorization
+ from app.core.security import create_token, hash_password, same_secret, verify_password, verify_token
+-from app.db.models import AuthIdentity, User
++from app.db.models import AuthIdentity, PendingSignup, User
+ from app.db.session import get_db
+ from app.services import audit, otp
+ from app.services.username import assign_username
+@@ -88,6 +91,12 @@ class EmailCodeIn(BaseModel):
+     code: str
+ 
+ 
++class SignupVerifyIn(BaseModel):
++    email: str
++    code: str
++    token: str = ""  # the secret returned by POST /signup to the browser that started this sign-up
++
++
+ class GoogleIn(BaseModel):
+     credential: str
+     mode: Literal["login", "signup"] = "login"
+@@ -113,6 +122,7 @@ class CodeSent(BaseModel):
+     status: str = "code_sent"
+     email_masked: str | None = None
+     resend_in: int | None = None
++    signup_token: str | None = None  # only POST /signup returns it; keep it in the browser and send it back with the code
+ 
+ 
+ # ---------------- helpers ----------------
+@@ -175,8 +185,15 @@ def _mark_signed_in(user: User) -> None:
+     user.last_login_at = now()
+ 
+ 
+-def _send_code(db: Session, email: str, user_id) -> None:
+-    """Create + email a code. Any failure rolls the whole request back so nothing half-saved remains."""
++PENDING_SIGNUP_HOURS = 24
++
++
++def _token_hash(token: str) -> str:
++    return hmac.new(settings.session_secret.encode(), f"signup-token:{token}".encode(), hashlib.sha256).hexdigest()
++
++
++def _send_code(db: Session, email: str, user_id=None) -> None:
++    """Create + email a sign-up code. Any failure rolls the whole request back so nothing half-saved remains."""
+     try:
+         code = otp.issue(db, email, "signup", user_id)
+         send_otp_email(email, code)
+@@ -206,10 +223,11 @@ def _me(user: User) -> Me:
+ # ---------------- sign up (email + password, then an emailed code) ----------------
+ @router.post("/signup", response_model=CodeSent)
+ def signup(body: SignupIn, request: Request, db: Session | None = Depends(get_db)) -> CodeSent:
++    """Step 1. Nothing is written to `users` here: the details wait in `pending_signups` until the emailed code is entered."""
+     db = _need_db(db)
+     name = body.name.strip()
+     email = _email(body.email)
+-    if len(name) < 2:
++    if len(name) < 2 or len(name) > 120:
+         raise _err(422, "bad_name", "Add your full name.")
+     if len(body.password) < 8 or len(body.password) > 128:
+         raise _err(422, "weak_password", "Use a password of 8 to 128 characters.")
+@@ -218,57 +236,77 @@ def signup(body: SignupIn, request: Request, db: Session | None = Depends(get_db
+     dob = _dob(body.dob)
+     phone = _phone(body.phone) if body.phone.strip() else None
+ 
+-    user = db.scalar(select(User).where(User.email == email))
+-    # A half-finished signup (email never verified) can be restarted; a real account cannot be taken over.
+-    if user and (user.email_verified or user.identities or user.role == "admin"):
++    if db.scalar(select(User.id).where(User.email == email)):
+         raise _err(409, "account_exists", "An account with this email already exists. Log in instead.")
+ 
+-    if user is None:
+-        user = User(email=email, full_name=name)
+-        db.add(user)
+-    user.full_name = name
+-    user.date_of_birth = dob
+-    user.phone_e164 = phone
+-    user.password_hash = hash_password(body.password)
+-    user.role = body.role
+-    user.job_alerts = body.alerts if body.role == "candidate" else False
+-    user.consented_at = now()
++    t = now()
++    db.execute(delete(PendingSignup).where(PendingSignup.expires_at < t))  # tidy abandoned sign-ups
++    token = secrets.token_urlsafe(32)
++    pending = db.scalar(select(PendingSignup).where(PendingSignup.email == email))
++    if pending is None:
++        pending = PendingSignup(email=email)
++        db.add(pending)
++    # Starting again replaces the earlier attempt AND its token, so only the latest browser can finish it.
++    pending.full_name = name
++    pending.date_of_birth = dob
++    pending.phone_e164 = phone
++    pending.password_hash = hash_password(body.password)
++    pending.role = body.role
++    pending.job_alerts = body.alerts if body.role == "candidate" else False
++    pending.token_hash = _token_hash(token)
++    pending.consented_at = t
++    pending.expires_at = t + timedelta(hours=PENDING_SIGNUP_HOURS)
+     try:
+         db.flush()
+     except IntegrityError:
+-        db.rollback()
+-        raise _err(409, "account_exists", "An account with this email already exists. Log in instead.") from None
++        db.rollback()  # two requests for the same new email raced
++        raise _err(409, "signup_busy", "A sign-up for this email is already in progress. Try again in a moment.") from None
+ 
+-    _send_code(db, email, user.id)
+-    audit.record(db, "Auth", "started sign-up", actor_id=user.id, actor_label=name, target_user_id=user.id, ip=_ip(request))
++    _send_code(db, email)
++    audit.record(db, "Auth", "started sign-up", actor_label=name, ip=_ip(request))
+     db.commit()
+-    return CodeSent(email_masked=mask_email(email), resend_in=settings.otp_resend_seconds)
++    return CodeSent(email_masked=mask_email(email), resend_in=settings.otp_resend_seconds, signup_token=token)
+ 
+ 
+ @router.post("/signup/resend", response_model=CodeSent)
+ def signup_resend(body: EmailIn, db: Session | None = Depends(get_db)) -> CodeSent:
+     db = _need_db(db)
+     email = _email(body.email)
+-    user = db.scalar(select(User).where(User.email == email, User.email_verified.is_(False)))
+-    if user and user.password_hash:  # same reply whether or not there is a pending signup
+-        _send_code(db, email, user.id)
++    pending = db.scalar(select(PendingSignup).where(PendingSignup.email == email, PendingSignup.expires_at > now()))
++    if pending:  # same reply whether or not there is a pending signup
++        _send_code(db, email)
+         db.commit()
+     return CodeSent(email_masked=mask_email(email), resend_in=settings.otp_resend_seconds)
+ 
+ 
+ @router.post("/signup/verify-email", response_model=LoginOut, response_model_exclude_none=True)
+-def signup_verify(body: EmailCodeIn, request: Request, db: Session | None = Depends(get_db)) -> LoginOut:
++def signup_verify(body: SignupVerifyIn, request: Request, db: Session | None = Depends(get_db)) -> LoginOut:
++    """Step 2. Needs the emailed code AND the token from step 1; only then does the account come into being."""
+     db = _need_db(db)
+     email = _email(body.email)
++    pending = db.scalar(select(PendingSignup).where(PendingSignup.email == email))
++    # The token is checked before the code so a stranger cannot even spend the code's attempts.
++    if pending is None or pending.expires_at < now() or not body.token or not hmac.compare_digest(
++        pending.token_hash, _token_hash(body.token)
++    ):
++        raise _err(400, "signup_restarted", "This sign-up is no longer valid, or was started from another browser. Start sign-up again.")
+     try:
+-        row = otp.verify(db, email, "signup", body.code)
++        otp.verify(db, email, "signup", body.code)
+     except otp.OtpError as exc:
+         raise _err(exc.status, "otp_invalid", exc.message) from None
+-    user = db.get(User, row.user_id) if row.user_id else None
+-    if user is None or user.email != email:
+-        db.rollback()
+-        raise _err(400, "otp_invalid", "That code is no longer valid. Start sign-up again.")
+-    user.email_verified = True
++
++    user = User(
++        email=email, full_name=pending.full_name, date_of_birth=pending.date_of_birth, phone_e164=pending.phone_e164,
++        password_hash=pending.password_hash, role=pending.role, job_alerts=pending.job_alerts,
++        consented_at=pending.consented_at, email_verified=True,
++    )
++    db.add(user)
++    db.delete(pending)
++    try:
++        db.flush()
++    except IntegrityError:
++        db.rollback()  # the email became an account (for example through Google) while this sign-up waited
++        raise _err(409, "account_exists", "An account with this email already exists. Log in instead.") from None
+     assign_username(db, user)
+     _mark_signed_in(user)
+     audit.record(db, "Auth", "verified their email and signed up", actor_id=user.id, actor_label=user.full_name,
+diff --git a/backend/db/schema.sql b/backend/db/schema.sql
+index fb75ffb..6d448ae 100644
+--- a/backend/db/schema.sql
++++ b/backend/db/schema.sql
+@@ -206,6 +206,24 @@ CREATE TABLE otp_codes (
+ 
+ CREATE INDEX ix_otp_destination_created ON otp_codes (destination, created_at);
+ 
++CREATE TABLE pending_signups (
++	id UUID NOT NULL, 
++	email VARCHAR(320) NOT NULL, 
++	full_name VARCHAR(120) NOT NULL, 
++	date_of_birth DATE NOT NULL, 
++	phone_e164 VARCHAR(20), 
++	password_hash VARCHAR(255) NOT NULL, 
++	role VARCHAR(20) NOT NULL, 
++	job_alerts BOOLEAN DEFAULT false NOT NULL, 
++	token_hash VARCHAR(64) NOT NULL, 
++	consented_at TIMESTAMP WITH TIME ZONE NOT NULL, 
++	expires_at TIMESTAMP WITH TIME ZONE NOT NULL, 
++	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
++	PRIMARY KEY (id), 
++	CONSTRAINT ck_pending_role CHECK (role IN ('candidate', 'recruiter')), 
++	UNIQUE (email)
++);
++
+ CREATE TABLE job_matches (
+ 	id UUID NOT NULL, 
+ 	job_id UUID NOT NULL, 
+diff --git a/backend/tests/test_auth_db.py b/backend/tests/test_auth_db.py
+index be3f2f7..7a23488 100644
+--- a/backend/tests/test_auth_db.py
++++ b/backend/tests/test_auth_db.py
+@@ -11,7 +11,7 @@ PHONE = "+919820011234"
+ PW = "Correct-horse-9"
+ 
+ RELOAD = [
+-    "app.core.config", "app.db.session", "app.db.init_db", "app.services.emailer", "app.services.otp",
++    "app.core.config", "app.db.session", "app.db.init_db", "app.db.upgrade", "app.services.emailer", "app.services.otp",
+     "app.services.google_auth", "app.core.deps", "app.routers.health", "app.routers.auth", "app.routers.admin", "app.main",
+ ]
+ 
+@@ -37,6 +37,7 @@ def env(tmp_path, monkeypatch):
+     e.session = mods["app.db.session"]
+     mods["app.db.init_db"].init_db()
+     e.codes = {}
++    e.tokens = {}
+     monkeypatch.setattr(e.auth, "send_otp_email", lambda to, code, purpose="signup": e.codes.__setitem__(to, code))
+     e.google = {"sub": "g-1", "email": EMAIL, "name": "Ann Lee"}
+     monkeypatch.setattr(e.auth, "verify_google_credential", lambda cred: dict(e.google))
+@@ -44,15 +45,26 @@ def env(tmp_path, monkeypatch):
+     return e
+ 
+ 
++def verify(e, email=EMAIL, code=None, token=None):
++    """Verify the sign-up. By default uses the code emailed last and the token the last POST /signup returned."""
++    return e.client.post("/api/auth/signup/verify-email", json={
++        "email": email, "code": e.codes[email] if code is None else code,
++        "token": e.tokens.get(email, "") if token is None else token,
++    })
++
++
+ def signup(e, email=EMAIL, password=PW, **kw):
+     body = {"name": "Ann Lee", "email": email, "password": password, "role": "candidate", "consent": True, "dob": "2001-01-10"}
+     body.update(kw)
+-    return e.client.post("/api/auth/signup", json=body)
++    r = e.client.post("/api/auth/signup", json=body)
++    if r.status_code == 200:
++        e.tokens[email] = r.json()["signup_token"]
++    return r
+ 
+ 
+ def complete_signup(e, email=EMAIL, **kw):
+     assert signup(e, email=email, **kw).status_code == 200
+-    r = e.client.post("/api/auth/signup/verify-email", json={"email": email, "code": e.codes[email]})
++    r = verify(e, email)
+     assert r.status_code == 200, r.text
+     return r.json()
+ 
+@@ -91,10 +103,13 @@ def test_signup_validation(env):
+     assert signup(env, phone="9820011234").json()["detail"]["code"] == "bad_phone"
+ 
+ 
+-def test_cannot_log_in_before_verifying_email(env):
++def test_signup_creates_no_account_until_the_code_is_verified(env):
+     assert signup(env).status_code == 200
++    assert user_row(env, email=EMAIL) is None
+     r = env.client.post("/api/auth/login", json={"username": EMAIL, "password": PW})
+-    assert r.status_code == 403 and r.json()["detail"]["code"] == "not_verified"
++    assert r.status_code == 401  # no account yet, so it looks like any wrong password
++    assert verify(env).status_code == 200
++    assert user_row(env, email=EMAIL).email_verified is True
+ 
+ 
+ def test_wrong_code_attempts_are_limited(env):
+@@ -102,8 +117,8 @@ def test_wrong_code_attempts_are_limited(env):
+     good = env.codes[EMAIL]
+     wrong = "000000" if good != "000000" else "111111"
+     for _ in range(3):
+-        assert env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": wrong}).status_code == 400
+-    r = env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": good})
++        assert verify(env, code=wrong).status_code == 400
++    r = verify(env, code=good)
+     assert r.status_code == 429  # locked out even with the right code
+ 
+ 
+@@ -115,7 +130,7 @@ def test_expired_code_rejected(env):
+     with env.session.SessionLocal() as db:
+         db.execute(update(OtpCode).values(expires_at=now() - timedelta(seconds=1)))
+         db.commit()
+-    r = env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": env.codes[EMAIL]})
++    r = verify(env)
+     assert r.status_code == 400 and "expired" in r.json()["detail"]["message"]
+ 
+ 
+@@ -126,8 +141,8 @@ def test_resend_issues_a_fresh_code_and_old_one_stops_working(env):
+     assert env.client.post("/api/auth/signup/resend", json={"email": EMAIL}).status_code == 200
+     new = env.codes[EMAIL]
+     if new != old:
+-        assert env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": old}).status_code == 400
+-    assert env.client.post("/api/auth/signup/verify-email", json={"email": EMAIL, "code": new}).status_code == 200
++        assert verify(env, code=old).status_code == 400
++    assert verify(env, code=new).status_code == 200
+ 
+ 
+ def test_resend_for_unknown_email_reveals_nothing(env):
+@@ -135,14 +150,71 @@ def test_resend_for_unknown_email_reveals_nothing(env):
+     assert r.status_code == 200 and "ghost@example.com" not in env.codes
+ 
+ 
+-def test_unverified_signup_can_be_restarted_but_verified_cannot_be_taken(env):
+-    assert signup(env).status_code == 200
+-    assert signup(env, password="Another-pass-1").status_code == 200  # abandoned signup restarted
++def test_verified_account_cannot_be_taken_by_a_new_signup(env):
+     complete_signup(env)
+-    r = signup(env)
++    r = signup(env, password="Another-pass-1")
+     assert r.status_code == 409 and r.json()["detail"]["code"] == "account_exists"
+ 
+ 
++def test_restarted_signup_cannot_be_finished_with_the_victims_code(env):
++    # The victim signs up honestly; an attacker then restarts the same email with their own password.
++    assert signup(env, password="Victim-pass-1").status_code == 200
++    victim_token = env.tokens[EMAIL]
++    assert signup(env, password="Attacker-pass-1").status_code == 200
++    attacker_token = env.tokens[EMAIL]
++    assert victim_token != attacker_token
++    code = env.codes[EMAIL]  # the attacker never sees this: it goes to the real owner's inbox
++    # the owner enters the emailed code with the token their own browser holds -> refused
++    r = verify(env, code=code, token=victim_token)
++    assert r.status_code == 400 and r.json()["detail"]["code"] == "signup_restarted"
++    # the attacker has the token but not the code -> refused, and no account exists
++    r = verify(env, code="000000" if code != "000000" else "111111", token=attacker_token)
++    assert r.status_code == 400
++    assert user_row(env, email=EMAIL) is None
++
++
++def test_signup_without_the_token_is_refused_even_with_the_right_code(env):
++    signup(env)
++    assert verify(env, token="").status_code == 400
++    assert verify(env, token="not-the-token").status_code == 400
++    assert user_row(env, email=EMAIL) is None
++    assert verify(env).status_code == 200  # the right pair still works afterwards (wrong tokens spent no attempts)
++
++
++def test_restarting_your_own_signup_uses_the_newest_password_and_token(env):
++    signup(env, password="First-pass-123")
++    signup(env, password="Second-pass-123")
++    assert verify(env).status_code == 200
++    ok = env.client.post("/api/auth/login", json={"username": EMAIL, "password": "Second-pass-123"})
++    assert ok.status_code == 200
++    assert env.client.post("/api/auth/login", json={"username": EMAIL, "password": "First-pass-123"}).status_code == 401
++
++
++def test_expired_pending_signup_cannot_be_verified(env):
++    from sqlalchemy import update
++    from app.db.models import PendingSignup
++    from app.services.timeutil import now
++    signup(env)
++    with env.session.SessionLocal() as db:
++        db.execute(update(PendingSignup).values(expires_at=now() - timedelta(seconds=1)))
++        db.commit()
++    assert verify(env).status_code == 400
++    assert user_row(env, email=EMAIL) is None
++
++
++def test_upgrade_removes_old_unverified_signups_but_keeps_real_accounts(env):
++    from app.db.models import User
++    from app.services.timeutil import now
++    complete_signup(env, email="real@example.com")
++    with env.session.SessionLocal() as db:   # what the old code left behind: a password-bearing, never-verified user
++        db.add(User(email="ghost@example.com", full_name="Ghost", password_hash="x", role="candidate", email_verified=False))
++        db.commit()
++    changes = env.mods["app.db.upgrade"].upgrade()
++    assert any("unverified" in c for c in changes)
++    assert user_row(env, email="ghost@example.com") is None
++    assert user_row(env, email="real@example.com") is not None
++
++
+ def test_password_login_and_lockout(env):
+     complete_signup(env)
+     ok = env.client.post("/api/auth/login", json={"username": "ANN@example.com", "password": PW})
+@@ -184,13 +256,14 @@ def test_google_never_creates_admin(env):
+     assert r.status_code == 422
+ 
+ 
+-def test_google_link_wipes_unverified_signup_password(env):
+-    # attacker signs up with the victim's email (never verifies), victim then uses Google
++def test_pending_signup_cannot_take_over_an_account_made_with_google(env):
++    # attacker starts a sign-up with the victim's email, then the victim uses Google
+     assert signup(env).status_code == 200
+-    r = env.client.post("/api/auth/google", json={"credential": "t", "mode": "login"})
++    r = env.client.post("/api/auth/google", json={"credential": "t", "mode": "signup", "consent": True})
+     assert r.status_code == 200
+     u = user_row(env, email=EMAIL)
+     assert u.password_hash is None and u.email_verified is True
++    assert verify(env).status_code == 409  # the waiting sign-up can no longer become an account
+     assert env.client.post("/api/auth/login", json={"username": EMAIL, "password": PW}).status_code == 401
+ 
+ 
+@@ -371,7 +444,7 @@ def test_a_reset_code_cannot_finish_a_signup(env):
+     complete_signup(env, email="c@example.com")
+     env.codes.clear()
+     ask_reset(env, "c@example.com")
+-    r = env.client.post("/api/auth/signup/verify-email", json={"email": "c@example.com", "code": env.codes["c@example.com"]})
++    r = verify(env, "c@example.com")  # a reset code, and the account already exists
+     assert r.status_code == 400
+ 
+ 
+diff --git a/frontend/assets/js/auth-client.js b/frontend/assets/js/auth-client.js
+index 95b612c..651485e 100644
+--- a/frontend/assets/js/auth-client.js
++++ b/frontend/assets/js/auth-client.js
+@@ -130,19 +130,24 @@
+ 
+   function demoOnly() { return Promise.resolve({ ok: false, error: DEMO_MSG }); }
+ 
++  // Secret from POST /signup. It stays in this page only; verifying needs it together with the emailed code, so a sign-up
++  // someone else restarts for your email cannot be completed with your code.
++  var signupToken = "";
++
+   function signup(f) {
+     if (cfg.mode !== "api") return demoOnly();
+     return post("/api/auth/signup", {
+       name: f.name, email: f.email, dob: f.dob, phone: f.phone || "", password: f.password,
+       role: f.role, alerts: !!f.alerts, consent: !!f.consent
+     }).then(function (r) {
++      if (r.ok) signupToken = r.data.signup_token || "";
+       return r.ok ? { ok: true, emailMasked: r.data.email_masked } : { ok: false, error: r.error, code: r.code };
+     });
+   }
+ 
+   function verifyEmail(email, code) {
+     if (cfg.mode !== "api") return demoOnly();
+-    return post("/api/auth/signup/verify-email", { email: email, code: code }).then(function (r) {
++    return post("/api/auth/signup/verify-email", { email: email, code: code, token: signupToken }).then(function (r) {
+       if (!r.ok) return { ok: false, error: r.error, code: r.code };
+       saveFromLogin("", r.data);
+       return { ok: true, role: r.data.role, needsPhone: !!r.data.needs_phone, needsProfile: !!r.data.needs_profile, username: r.data.username || "" };

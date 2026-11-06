@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db import session as db_session
-from app.routers import admin, admin_ai, ask, auth, candidates, health, jobs, matches, pipeline, recruiter
+from app.routers import admin, admin_ai, ask, auth, candidate, candidates, health, jobs, matches, pipeline, recruiter
 
 log = logging.getLogger("hiriq")
 
@@ -58,11 +58,11 @@ app.include_router(candidates.router, prefix="/api/recruiter")
 app.include_router(matches.router, prefix="/api/recruiter")
 app.include_router(pipeline.router, prefix="/api/recruiter")
 app.include_router(ask.router, prefix="/api/recruiter")
+app.include_router(candidate.router, prefix="/api/candidate")
 
 # Upcoming routers (see backend/README.md):
 #   /api/recruiter - all recruiter routers are live (jobs, candidates, matcher, pipeline, ask-the-pool)
-#   /api/resumes   - candidate-side upload + structured extraction (GenAI)
-#   /api/match     - score a resume against a job, with explanation
+#   /api/candidate - live: profile + resume, insights, job browse and match. Next: rewriter, recommendations, interview prep
 #   /api/admin     - users, sources, model metrics (users, overview, audit and AI usage are live)
 
 # Serve the plain HTML/CSS/JS frontend from the same server, so one URL runs everything.

@@ -1,5 +1,23 @@
 -- Hiriq schema (PostgreSQL). Generated from app/db/models.py and app/db/recruiter_models.py; do not edit by hand.
 
+CREATE TABLE pending_signups (
+	id UUID NOT NULL, 
+	email VARCHAR(320) NOT NULL, 
+	full_name VARCHAR(120) NOT NULL, 
+	date_of_birth DATE NOT NULL, 
+	phone_e164 VARCHAR(20), 
+	password_hash VARCHAR(255) NOT NULL, 
+	role VARCHAR(20) NOT NULL, 
+	job_alerts BOOLEAN DEFAULT false NOT NULL, 
+	token_hash VARCHAR(64) NOT NULL, 
+	consented_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	expires_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_pending_role CHECK (role IN ('candidate', 'recruiter')), 
+	UNIQUE (email)
+);
+
 CREATE TABLE plans (
 	id VARCHAR(20) NOT NULL, 
 	name VARCHAR(40) NOT NULL, 
