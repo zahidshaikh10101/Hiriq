@@ -15,6 +15,7 @@ Matching page can show both (they are set from the Pipeline routes in pipeline.p
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
@@ -100,6 +101,11 @@ def _cand_view(c: Candidate) -> dict:
             "qualification": c.qualification, "education": education}
 
 
+def _cand_sig(c: Candidate) -> str:
+    """A fingerprint of everything the engine reads about a candidate. If it changes after a ranking, that ranking is stale."""
+    return hashlib.sha256(json.dumps(_cand_view(c), sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
 def _cached_verdicts(row: JobMatch | None, c: Candidate) -> tuple[dict, dict | None]:
     """AI verdicts from an earlier check, reused while the resume text is unchanged (so changing weights costs no AI call)."""
     judge = ((row.explanation or {}).get("judge") if row else None) or None
@@ -119,6 +125,7 @@ def _stored_weights(pairs: list) -> dict:
 
 def _store(row: JobMatch, result: dict, judge: dict | None, c: Candidate) -> None:
     explanation = dict(result["explanation"])
+    explanation["cand_sig"] = _cand_sig(c)
     if judge and judge.get("verdicts"):
         explanation["judge"] = judge
     row.score = result["score"]
@@ -172,7 +179,8 @@ def _payload(db: Session, actor: User, job: Job, limit: int = 50, offset: int = 
                 "skills_nice": list(job.skills_nice or []), "location": job.location, "work_mode": job.work_mode,
                 "experience_min": job.experience_min, "experience_max": job.experience_max},
         "ranked": bool(pairs), "computed_at": _iso(computed), "weights": weights, "old_version": old_version, "default_weights": dict(matching.DEFAULT_WEIGHTS),
-        "stale": {"job_changed": bool(computed and aware(job.updated_at) > computed), "new_candidates": len(fresh)},
+        "stale": {"job_changed": bool(computed and aware(job.updated_at) > computed), "new_candidates": len(fresh),
+                  "edited_candidates": sum(1 for r, c in pairs if (r.explanation or {}).get("cand_sig") not in (None, _cand_sig(c)))},
         "counts": {"total": len(pairs), "strong": sum(1 for r, _ in pairs if r.score >= STRONG_SCORE),
                    "ai_checked": sum(1 for r, _ in pairs if (r.explanation or {}).get("judge", {}).get("verdicts")),
                    "with_gaps": sum(1 for r, _ in pairs if any(x["credit"] == 0 for x in (r.explanation or {}).get("skills", {}).get("required", [])))},

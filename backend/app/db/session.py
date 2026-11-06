@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
@@ -14,7 +14,15 @@ def _make_engine():
     if not url:
         return None
     if url.startswith("sqlite"):
-        return create_engine(url, connect_args={"check_same_thread": False})
+        engine = create_engine(url, connect_args={"check_same_thread": False})
+
+        @event.listens_for(engine, "connect")
+        def _fk_on(dbapi_conn, _record):   # SQLite ignores ON DELETE CASCADE unless this is set on every connection
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+
+        return engine
     return create_engine(
         url,
         pool_pre_ping=True,   # Neon suspends idle compute; this transparently reconnects

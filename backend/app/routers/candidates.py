@@ -58,7 +58,7 @@ def _iso(dt) -> str | None:
 # ---------- who may see whom ----------
 def _members_visible():
     """Platform candidates count only while their account is active and verified."""
-    return and_(Candidate.source == "platform", User.status == "active", User.email_verified.is_(True))
+    return and_(Candidate.source == "platform", User.role == "candidate", User.status == "active", User.email_verified.is_(True))
 
 
 def _sync_members(db: Session) -> None:
@@ -90,7 +90,7 @@ def _find(db: Session, actor: User, candidate_id: str) -> Candidate:
         return c
     if c.source == "platform" and c.user_id is not None:
         u = db.get(User, c.user_id)
-        if u is not None and u.status == "active" and u.email_verified:
+        if u is not None and u.role == "candidate" and u.status == "active" and u.email_verified:
             return c
     raise _err(404, "not_found", "That candidate does not exist.")
 

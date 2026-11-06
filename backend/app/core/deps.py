@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.security import verify_token
 from app.db.models import User
 from app.db.session import get_db
+from app.services.timeutil import aware
 
 
 def bearer(authorization: str | None) -> str:
@@ -30,6 +31,13 @@ def user_from_authorization(authorization: str | None, db: Session | None) -> Us
         return None
     if user is None or user.status != "active":
         return None
+    if user.tokens_valid_after is not None:
+        try:
+            issued = float(payload.get("iat", 0))        # tokens made before this check existed have no iat: refused after a reset
+        except (TypeError, ValueError):
+            return None
+        if issued < aware(user.tokens_valid_after).timestamp():
+            return None
     return user
 
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -149,7 +149,8 @@ class AddIn(BaseModel):
 
 
 @router.post("/jobs/{job_id}/pipeline", status_code=201)
-def add_to_board(job_id: str, body: AddIn, actor: User = Depends(require_recruiter), db: Session | None = Depends(get_db)) -> dict:
+def add_to_board(job_id: str, body: AddIn, response: Response, actor: User = Depends(require_recruiter),
+                 db: Session | None = Depends(get_db)) -> dict:
     db = _db(db)
     job = _job(db, actor, job_id)
     if job.status == "closed":
@@ -166,6 +167,8 @@ def add_to_board(job_id: str, body: AddIn, actor: User = Depends(require_recruit
         who = added[0].full_name if len(added) == 1 else f"{len(added)} candidates"
         _event(db, actor, job, f"You added {who} to the {job.title} pipeline", added[0].id if len(added) == 1 else None)
     db.commit()
+    if not added:
+        response.status_code = 200      # nothing new was created, so not "201 Created"
     return {**_board(db, actor, job), "added": len(added), "already_there": len(people) - len(added)}
 
 

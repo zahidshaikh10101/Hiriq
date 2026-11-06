@@ -20,6 +20,7 @@ from app.db.recruiter_models import (
 )
 from app.db.session import get_db
 from app.routers.candidates import _members_visible
+from app.services import matching
 from app.services.timeutil import aware, now
 
 router = APIRouter(tags=["recruiter"])
@@ -49,7 +50,7 @@ def _pool_filter(actor: User):
 
 
 def _norm(skill: str) -> str:
-    return " ".join(str(skill).lower().split())
+    return matching.canon(str(skill)) or " ".join(str(skill).lower().split())
 
 
 def _drop_off(counts: list[int]) -> list[int | None]:
@@ -99,7 +100,12 @@ def overview(actor: User = Depends(require_recruiter), db: Session | None = Depe
     scores_by_job: dict = {jid: [] for jid in job_ids}
     entry_count: Counter = Counter()
     if job_ids:
-        for jid, score in db.execute(select(JobMatch.job_id, JobMatch.score).where(JobMatch.job_id.in_(job_ids))).all():
+        visible = (
+            select(JobMatch.job_id, JobMatch.score)
+            .join(Candidate, Candidate.id == JobMatch.candidate_id).outerjoin(User, User.id == Candidate.user_id)
+            .where(JobMatch.job_id.in_(job_ids), _pool_filter(actor))
+        )
+        for jid, score in db.execute(visible).all():
             scores_by_job[jid].append(score)
         for (jid,) in db.execute(select(PipelineEntry.job_id).where(PipelineEntry.job_id.in_(job_ids))).all():
             entry_count[jid] += 1
@@ -123,8 +129,8 @@ def overview(actor: User = Depends(require_recruiter), db: Session | None = Depe
         bands = [sum(1 for s in scores if lo <= s < hi) for lo, hi in BANDS]
         top = db.execute(
             select(JobMatch.score, Candidate.id, Candidate.full_name, Candidate.current_title)
-            .join(Candidate, Candidate.id == JobMatch.candidate_id)
-            .where(JobMatch.job_id == j.id).order_by(JobMatch.score.desc()).limit(5)
+            .join(Candidate, Candidate.id == JobMatch.candidate_id).outerjoin(User, User.id == Candidate.user_id)
+            .where(JobMatch.job_id == j.id, _pool_filter(actor)).order_by(JobMatch.score.desc()).limit(5)
         ).all()
         quality.append({
             "job_id": str(j.id), "title": j.title, "bands": bands, "band_labels": BAND_LABELS, "total": len(scores),

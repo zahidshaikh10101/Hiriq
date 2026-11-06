@@ -4,6 +4,8 @@
 
 It lists the free models your key can see, then sends one tiny request to each model in LLM_MODELS (or the defaults)
 and prints what came back, including OpenRouter's own error text. Use it when "Write with AI" says the models are busy.
+The default ids in llm.py are only a starting point: free models are renamed and withdrawn often, so trust this list over
+them, and put the strongest working model first in LLM_MODELS (the first one is tried first).
 """
 from __future__ import annotations
 
@@ -34,7 +36,7 @@ def main() -> int:
         else:
             print(f"Could not list models: http {listing.status_code} {llm._error_text(listing)}")
 
-        print("\nTesting the models Hiriq will use (LLM_MODELS or the defaults):")
+        print("\nTesting the models Hiriq will use, in the order they are tried (LLM_MODELS or the defaults):")
         worst = 0
         for model in llm._models():
             try:

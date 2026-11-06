@@ -76,5 +76,5 @@ python -m app.services.llm_check                 # find out which AI models work
 
 - Rate-limit by IP (per-account lockout, code caps and per-feature AI limits already exist).
 - Behind a proxy, read the real client IP from `X-Forwarded-For` for audit logs.
-- Add refresh tokens, or move to a JWT library; revoke tokens on password reset.
+- Add refresh tokens, or move to a JWT library. (A password reset already signs out older sessions.)
 - Move from `init_db` and `upgrade` to Alembic migrations once the schema changes under real data.

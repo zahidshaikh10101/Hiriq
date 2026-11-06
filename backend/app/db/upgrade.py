@@ -4,7 +4,7 @@
 
 The API also runs this once when it starts, so a new column or rule never leaves you with a crashing signup.
 What it does today:
- - users.date_of_birth (new column)
+ - users.date_of_birth and users.tokens_valid_after (new columns)
  - otp_codes accepts the purpose 'reset' (forgot password) as well as 'signup'
 Your users, admins and audit log are never touched.
 """
@@ -30,6 +30,9 @@ def upgrade() -> list[str]:
         if "date_of_birth" not in cols:
             conn.execute(text("ALTER TABLE users ADD COLUMN date_of_birth DATE"))
             done.append("added users.date_of_birth")
+        if "tokens_valid_after" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN tokens_valid_after TIMESTAMP WITH TIME ZONE"))
+            done.append("added users.tokens_valid_after")
 
         if engine.dialect.name == "postgresql":
             rows = conn.execute(text(

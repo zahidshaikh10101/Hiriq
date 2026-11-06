@@ -32,7 +32,6 @@
       '<div class="head-tools">' + (badge || "") + "</div></header>";
   }
   var LIVE = '<span class="live-badge"><span class="dot pulse" style="background:rgb(var(--a4))"></span>Live data</span>';
-  var SAMPLE = '<span class="demo-badge"><span class="dot" style="background:rgb(var(--warn))"></span>Sample data</span>';
 
   function loading(title) {
     view.innerHTML = '<div class="view">' + header(title) + '<div class="card loading" role="status">Loading…</div></div>';
@@ -178,12 +177,6 @@
     var first = String(D.me.name || "").split(" ")[0] || "there";
     var where = [D.me.designation, D.me.company].filter(Boolean).join(" at ");
 
-    var sample = D.has_demo
-      ? '<div class="sample-banner" role="note">' + icon("warn", 18) +
-        "<span>You are looking at <strong>sample data</strong> with fictional people, so the dashboard is not empty while we build the next phases. " +
-        "Remove it any time with <code>python -m app.db.seed_recruiter_demo your-email --clear</code> (your real data is never touched).</span></div>"
-      : "";
-
     var start = D.empty
       ? '<div class="card card-stack"><h2 class="card-title">Welcome to Hiriq. Here is how a hire flows.</h2>' +
         '<ol class="start-steps">' +
@@ -200,9 +193,9 @@
       '<a class="btn btn-ghost glass" href="#matching">' + icon("search", 16) + 'Match candidates</a></div>';
 
     view.innerHTML =
-      '<div class="view">' + header("Overview", D.has_demo ? SAMPLE : LIVE) +
+      '<div class="view">' + header("Overview", LIVE) +
       '<div class="welcome"><p>Welcome back, <strong>' + esc(first) + "</strong>" + (where ? " · " + esc(where) : "") + "</p>" + quick + "</div>" +
-      sample + start +
+      start +
       '<div class="grid-auto" style="--min:170px">' + D.kpis.map(kpiCard).join("") + "</div>" +
       '<div class="row">' +
         '<div class="card card-stack grow-2"><div class="row-between"><div class="stack-2"><h2 class="card-title">Hiring funnel</h2><span class="card-sub">Sourced to hired, across all your jobs</span></div>' +

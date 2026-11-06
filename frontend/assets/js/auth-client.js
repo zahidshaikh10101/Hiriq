@@ -121,7 +121,8 @@
 
     // demo mode
     var expires = Date.now() + cfg.sessionHours * 3600 * 1000;
-    var ok = user === cfg.demoAdmin.username && sha256(password) === cfg.demoAdmin.passwordSha256;
+    var da = cfg.demoAdmin;
+    var ok = !!da && user === da.username && sha256(password) === da.passwordSha256;
     if (!ok) return Promise.resolve({ ok: false, error: "That username and password do not match." });
     save({ user: user, role: "admin", exp: expires, mode: "demo" });
     return Promise.resolve({ ok: true, role: "admin" });

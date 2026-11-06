@@ -42,7 +42,7 @@ MAX_ANSWER = 1200
 
 PROTECTED = re.compile(
     r"\b(male|female|men|women|woman|gender|aged|age|young|younger|older|elderly|married|unmarried|pregnan\w*|muslim|hindu|christian|sikh|jain|buddhist|"
-    r"religion|religious|caste|nationality|race|racial|ethnic\w*|disabled|disability|lgbt\w*|gay)\b", re.I)
+    r"religion|religious|caste|nationality|race(?!\s+conditions?)|racial|ethnic\w*|disabled|disability|lgbt\w*|gay)\b", re.I)
 
 
 def _err(status: int, code: str, message: str) -> HTTPException:

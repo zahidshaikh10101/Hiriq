@@ -180,6 +180,13 @@ def test_adding_puts_people_in_sourced_and_is_idempotent(scene):
     assert again["available_total"] == 0
 
 
+def test_adding_only_people_already_there_answers_200(scene):
+    env, uid, h, job, ids = scene
+    put_on(env, h, job, ids["ana"])
+    r = env.client.post(f"/api/recruiter/jobs/{job}/pipeline", headers=h, json={"candidate_ids": [ids["ana"]]})
+    assert r.status_code == 200 and r.json()["added"] == 0 and r.json()["already_there"] == 1
+
+
 def test_adding_needs_at_least_one_and_not_too_many(scene):
     env, uid, h, job, ids = scene
     url = f"/api/recruiter/jobs/{job}/pipeline"

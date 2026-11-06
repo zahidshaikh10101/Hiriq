@@ -27,6 +27,7 @@ CREATE TABLE users (
 	failed_logins INTEGER DEFAULT '0' NOT NULL, 
 	locked_until TIMESTAMP WITH TIME ZONE, 
 	last_login_at TIMESTAMP WITH TIME ZONE, 
+	tokens_valid_after TIMESTAMP WITH TIME ZONE, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	PRIMARY KEY (id), 

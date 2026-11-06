@@ -305,7 +305,7 @@ def test_the_page_knows_when_the_ranking_is_out_of_date(scene):
 
     env, uid, h, job, ids = scene
     d = match(env, h, job).json()
-    assert d["stale"] == {"job_changed": False, "new_candidates": 0}
+    assert d["stale"] == {"job_changed": False, "new_candidates": 0, "edited_candidates": 0}
     add_cand(env, uid, **{**MEDIUM, "full_name": "New Person"})
     assert env.client.get(f"/api/recruiter/jobs/{job}/matches", headers=h).json()["stale"]["new_candidates"] == 1
     with env.session.SessionLocal() as db:
@@ -314,9 +314,22 @@ def test_the_page_knows_when_the_ranking_is_out_of_date(scene):
         j.updated_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc) + __import__("datetime").timedelta(milliseconds=50)
         db.commit()
     s = env.client.get(f"/api/recruiter/jobs/{job}/matches", headers=h).json()["stale"]
-    assert s == {"job_changed": True, "new_candidates": 1}
+    assert s == {"job_changed": True, "new_candidates": 1, "edited_candidates": 0}
     __import__("time").sleep(0.1)
-    assert match(env, h, job).json()["stale"] == {"job_changed": False, "new_candidates": 0}
+    assert match(env, h, job).json()["stale"] == {"job_changed": False, "new_candidates": 0, "edited_candidates": 0}
+
+
+def test_an_edited_candidate_is_flagged_but_is_not_counted_as_new(scene):
+    from app.db.recruiter_models import Candidate
+
+    env, uid, h, job, ids = scene
+    match(env, h, job)
+    with env.session.SessionLocal() as db:
+        db.get(Candidate, uuid.UUID(ids["medium"])).skills = ["SQL", "Excel", "Python"]
+        db.commit()
+    s = env.client.get(f"/api/recruiter/jobs/{job}/matches", headers=h).json()["stale"]
+    assert s == {"job_changed": False, "new_candidates": 0, "edited_candidates": 1}
+    assert match(env, h, job).json()["stale"]["edited_candidates"] == 0
 
 
 def test_listing_before_any_run_is_empty_not_an_error(scene):

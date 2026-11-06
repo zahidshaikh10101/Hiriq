@@ -31,7 +31,9 @@ log = logging.getLogger("hiriq.llm")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Free models come and go on OpenRouter (gpt-oss-120b and llama-3.3-70b both stopped being free). If one disappears,
 # run `python -m app.services.llm_check` and change LLM_MODELS in .env; no code change needed.
-DEFAULT_MODELS = ["liquid/lfm-2.5-2.6b:free", "nvidia/nemotron-3-ultra-550b-a55b:free"]
+# The first model is tried first. A large model reads resumes and keeps to the JSON format far more reliably than a 2.6B one,
+# so the big one leads and the small, fast one is the backup. Check these ids with llm_check: free ids change without notice.
+DEFAULT_MODELS = ["nvidia/nemotron-3-ultra-550b-a55b:free", "liquid/lfm-2.5-2.6b:free"]
 
 
 class LLMError(Exception):

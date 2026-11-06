@@ -1,6 +1,6 @@
 /* Hiriq — recruiter: Matching (rank the candidate pool against one job).
    A factory: recruiter.js calls window.HiriqMatching(helpers) and gets { show(jobId) } back.
-   Step 1 is instant and rule based (skills, experience, location). Step 2, started by itself afterwards, is an optional AI look
+   Step 1 is instant and rule based (skills, qualification, experience, location and keywords). Step 2, started by itself afterwards, is an optional AI look
    at the gaps of the top candidates; if it is unavailable the ranking above it is still complete. Every skill shows the resume
    line it came from. Parts the resume cannot answer are shown as "not assessed", never as zero.
    Phase 5 adds, under each candidate: thumbs up/down (labels for the ranker later, they never change a score) and
@@ -79,6 +79,7 @@ window.HiriqMatching = function (R) {
     var s = S.data.stale, out = "";
     if (S.data.ranked && s.job_changed) out += '<div class="notice notice-warn" role="status">' + icon("warn", 18) + "<span>This job was edited after the last ranking. Rank again to use its latest requirements.</span></div>";
     if (S.data.ranked && s.new_candidates) out += '<div class="notice notice-info" role="status">' + icon("info", 18) + "<span>" + s.new_candidates + " candidate" + (s.new_candidates === 1 ? " was" : "s were") + " added since the last ranking and " + (s.new_candidates === 1 ? "is" : "are") + " not ranked yet.</span></div>";
+    if (S.data.ranked && s.edited_candidates) out += '<div class="notice notice-info" role="status">' + icon("info", 18) + "<span>" + s.edited_candidates + " candidate" + (s.edited_candidates === 1 ? " was" : "s were") + " edited since the last ranking, so " + (s.edited_candidates === 1 ? "their score" : "those scores") + " may be out of date. Rank again to refresh.</span></div>";
     if (S.data.ranked && S.data.old_version) out += '<div class="notice notice-info" role="status">' + icon("info", 18) + "<span>" + S.data.old_version + " score" + (S.data.old_version === 1 ? " was" : "s were") + " made before qualification and keywords were added. Rank again to include them.</span></div>";
     return out;
   }
@@ -110,14 +111,18 @@ window.HiriqMatching = function (R) {
       ? '<div class="chips-row"><span class="faint m-lbl">Missing</span>' + chips(c.missing_required.slice(0, 5), "chip-miss") + (c.missing_required.length > 5 ? ' <span class="faint">+' + (c.missing_required.length - 5) + "</span>" : "") + "</div>"
       : '<div class="chips-row"><span class="faint m-lbl">All required skills found</span></div>';
     var partial = c.assessed_weight != null && c.assessed_weight < 100
-      ? '<div class="m-partial">Scored on ' + c.assessed_weight + "% of the criteria. The rest could not be read from the resume.</div>" : "";
+      ? '<div class="m-partial">' + (c.assessed_weight === 0
+        ? "Not assessed: the resume gave nothing to score for this job."
+        : "Scored on " + c.assessed_weight + "% of the criteria. The rest could not be read from the resume.") + "</div>" : "";
     var meta = [c.headline, c.location, c.years != null ? (c.years === 1 ? "1 yr" : +Number(c.years).toFixed(1) + " yrs") : ""].filter(Boolean).map(esc).join(" · ");
     return '<li class="m-row' + (open ? " open" : "") + '" data-cid="' + esc(c.candidate_id) + '">' +
       '<button type="button" class="m-head" aria-expanded="' + open + '" data-toggle="' + esc(c.candidate_id) + '">' +
       '<span class="rank">' + (i + 1) + "</span>" +
       '<span class="cell-stack m-who"><strong>' + esc(c.name || "Unnamed") + "</strong>" + (meta ? "<small>" + meta + "</small>" : "") + "</span>" +
       '<span class="m-badges">' + (c.source === "platform" ? '<span class="chip chip-violet">Hiriq member</span>' : "") + (c.ai_checked ? '<span class="chip chip-cyan" title="An AI model double-checked the gaps">AI-checked</span>' : "") + "</span>" +
-      '<span class="score-chip' + scoreClass(c.score) + '" aria-label="Match score ' + c.score + ' out of 100">' + c.score + "</span></button>" +
+      (c.assessed_weight === 0
+        ? '<span class="score-chip low" title="Nothing in the resume could be scored for this job" aria-label="Not assessed">n/a</span></button>'
+        : '<span class="score-chip' + scoreClass(c.score) + '" aria-label="Match score ' + c.score + ' out of 100">' + c.score + "</span></button>") +
       '<div class="m-body"><div class="m-bars">' + partBars(c.parts) + "</div>" + missing + partial + pipeStrip(c) + "</div>" +
       '<div class="m-detail" id="d-' + esc(c.candidate_id) + '"' + (open ? "" : " hidden") + ">" + (open ? detailHtml(c.candidate_id) : "") + "</div></li>";
   }

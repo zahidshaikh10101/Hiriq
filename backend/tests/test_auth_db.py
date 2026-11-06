@@ -375,6 +375,30 @@ def test_a_reset_code_cannot_finish_a_signup(env):
     assert r.status_code == 400
 
 
+def test_a_password_reset_signs_out_sessions_opened_before_it(env):
+    old = complete_signup(env)["access_token"]
+    assert env.client.get("/api/auth/me", headers=auth(old)).status_code == 200
+    env.codes.clear()
+    ask_reset(env)
+    assert do_reset(env, env.codes[EMAIL]).status_code == 200
+    assert env.client.get("/api/auth/me", headers=auth(old)).status_code == 401
+    fresh = env.client.post("/api/auth/login", json={"username": EMAIL, "password": "Brand-new-pass-7"}).json()["access_token"]
+    assert env.client.get("/api/auth/me", headers=auth(fresh)).status_code == 200
+
+
+def test_the_lockout_reply_is_the_same_for_known_and_unknown_emails(env):
+    complete_signup(env)
+
+    def hammer(ident):
+        out = []
+        for _ in range(7):
+            r = env.client.post("/api/auth/login", json={"username": ident, "password": "wrong-pass-1"})
+            out.append((r.status_code, r.json()["detail"]["code"]))
+        return out
+
+    assert hammer(EMAIL) == hammer("nobody-here@example.com")
+
+
 # ================= usernames =================
 def test_username_is_initials_plus_dob_and_works_for_login(env):
     out = complete_signup(env, name="Zahid Salim Shaikh", dob="2001-01-10")

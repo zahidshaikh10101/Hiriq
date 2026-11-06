@@ -59,7 +59,8 @@ def password_needs_rehash(password_hash: str) -> bool:
 
 # ---------- tokens ----------
 def create_token(subject: str, role: str, secret: str, hours: int) -> str:
-    payload = {"sub": subject, "role": role, "exp": int(time.time()) + hours * 3600}
+    issued = time.time()
+    payload = {"sub": subject, "role": role, "iat": int(issued * 1000) / 1000, "exp": int(issued) + hours * 3600}
     body = _b64(json.dumps(payload, separators=(",", ":")).encode())
     return f"{body}.{_sign(body, secret)}"
 
@@ -69,7 +70,7 @@ def verify_token(token: str, secret: str) -> dict | None:
         body, sig = token.split(".", 1)
     except ValueError:
         return None
-    if not hmac.compare_digest(sig, _sign(body, secret)):
+    if not hmac.compare_digest(sig.encode(), _sign(body, secret).encode()):
         return None
     try:
         payload = json.loads(_unb64(body))

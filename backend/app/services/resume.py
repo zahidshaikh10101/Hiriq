@@ -142,18 +142,26 @@ def _compact(s: str) -> str:
     return re.sub(r"[^a-z0-9+#]", "", s.lower())
 
 
+def _skill_pattern(skill: str) -> "re.Pattern[str]":
+    """The skill as a whole name. Its words may be joined by nothing, a space, a dot or a dash ("Power BI" / "PowerBI" /
+    "Power-BI"), but it can never be a piece of a longer word ("sql" in "mysql" is not "SQL"; "excel" in "excellent" is not Excel)."""
+    key = skill.lower().strip()
+    pieces = re.findall(r"[a-z0-9]+", key)
+    if not pieces:
+        return re.compile(re.escape(key))
+    tail = key[len(key.rstrip("+#")):]                      # C++ and C# keep their symbols
+    body = r"[\s._/\-]{0,2}".join(re.escape(p) for p in pieces) + re.escape(tail)
+    return re.compile(r"(?<![a-z0-9])" + body + (r"(?![a-z0-9])" if tail else r"(?![a-z0-9+#])"))
+
+
 def keep_supported_skills(skills: list[str], text: str) -> list[str]:
     """A skill the resume never mentions is dropped. This is the guard against a model padding the list.
 
     "Power BI" is found in "PowerBI", "Node.js" in "NodeJS". Very short names ("R", "C") must appear as whole words."""
     low = text.lower()
-    squashed = _compact(text)
     kept = []
     for skill in clean_skills(skills):
-        key = skill.lower()
-        whole = re.search(r"(?<![a-z0-9])" + re.escape(key) + r"(?![a-z0-9])", low) is not None
-        loose = len(_compact(skill)) >= 4 and _compact(skill) in squashed
-        if whole or loose:
+        if _skill_pattern(skill).search(low):
             kept.append(skill)
     return kept
 
@@ -261,8 +269,10 @@ def experience_years(employers: list[Employer], today: date | None = None) -> fl
     today = today or date.today()
     cap = today.year * 12 + today.month - 1
     spans: list[tuple[int, int]] = []
-    for job in employers:
+    for i, job in enumerate(employers):
         start, end = parse_month(job.start, today), parse_month(job.end, today, end=True)
+        if end is None and i == 0 and not (job.end or "").strip():
+            end = cap   # employers come most recent first: the latest job with no end date is taken as current
         if start is None or end is None or start > cap:
             continue
         end = min(end, cap)

@@ -99,7 +99,7 @@ class JobIn(BaseModel):
     @classmethod
     def _work_mode(cls, v):
         if v is not None and v not in WORK_MODES:
-            raise ValueError("Work mode must be on-site, hybrid or remote.")
+            raise ValueError("Work mode must be onsite, hybrid or remote.")
         return v
 
     @field_validator("employment_type")
@@ -213,7 +213,7 @@ def generate_jd(body: JobIn, actor: User = Depends(require_recruiter), db: Sessi
     if not body.skills_required and not body.responsibilities:
         raise _err(422, "need_details", "Add at least one required skill or a few lines about the day-to-day work, so the JD has something real to say.")
     since = now() - timedelta(hours=1)
-    recent = db.scalar(select(func.count()).select_from(AiCall).where(AiCall.owner_id == actor.id, AiCall.purpose == "jd", AiCall.created_at >= since)) or 0
+    recent = db.scalar(select(func.count()).select_from(AiCall).where(AiCall.owner_id == actor.id, AiCall.purpose == "jd", AiCall.ok.is_(True), AiCall.created_at >= since)) or 0
     if recent >= GENERATE_PER_HOUR:
         raise _err(429, "slow_down", "That is a lot of rewrites for one hour. Edit the text by hand or try again later.")
     try:

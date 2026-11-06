@@ -278,6 +278,33 @@ def signup_verify(body: EmailCodeIn, request: Request, db: Session | None = Depe
 
 
 # ---------------- log in with email/username + password ----------------
+# Real accounts lock after repeated failures. If an unknown email never locked, the "too many attempts" reply would tell an
+# attacker the account exists. So unknown identifiers are counted and locked the same way (in memory, per process).
+_ghosts: dict[str, list] = {}   # identifier -> [failed count, locked until]
+_GHOST_LIMIT = 5000
+
+
+def _ghost_wait(ident: str) -> int:
+    entry = _ghosts.get(ident)
+    if entry and entry[1] and entry[1] > now():
+        return max(1, int((entry[1] - now()).total_seconds() // 60) + 1)
+    return 0
+
+
+def _ghost_fail(ident: str) -> None:
+    if len(_ghosts) >= _GHOST_LIMIT and ident not in _ghosts:
+        t = now()
+        for key in [k for k, v in _ghosts.items() if not v[1] or v[1] <= t]:
+            del _ghosts[key]
+        if len(_ghosts) >= _GHOST_LIMIT:
+            return
+    entry = _ghosts.setdefault(ident, [0, None])
+    entry[0] += 1
+    if entry[0] >= settings.max_failed_logins:
+        entry[1] = now() + timedelta(minutes=settings.lockout_minutes)
+        entry[0] = 0
+
+
 def _login_legacy(body: LoginIn) -> LoginOut:
     if not settings.auth_ready:
         raise HTTPException(
@@ -302,7 +329,11 @@ def login(body: LoginIn, request: Request, db: Session | None = Depends(get_db))
     user = db.scalar(select(User).where(or_(User.email == ident, User.username == ident)))
     bad = _err(401, "bad_credentials", "That email and password do not match.")
 
-    if user and user.locked_until and aware(user.locked_until) > now():
+    if user is None:
+        wait = _ghost_wait(ident)
+        if wait:
+            raise _err(429, "locked", f"Too many failed attempts. Try again in {wait} minutes.")
+    elif user.locked_until and aware(user.locked_until) > now():
         mins = max(1, int((aware(user.locked_until) - now()).total_seconds() // 60) + 1)
         raise _err(429, "locked", f"Too many failed attempts. Try again in {mins} minutes.")
 
@@ -315,6 +346,8 @@ def login(body: LoginIn, request: Request, db: Session | None = Depends(get_db))
                              actor_label=user.full_name, target_user_id=user.id, ip=_ip(request))
                 user.failed_logins = 0
             db.commit()
+        else:
+            _ghost_fail(ident)
         raise bad
 
     _check_active(user)
@@ -373,6 +406,7 @@ def password_reset(body: ResetIn, request: Request, db: Session | None = Depends
     user.password_hash = hash_password(body.new_password)
     user.failed_logins = 0
     user.locked_until = None  # they proved they own the email, so a lockout no longer applies
+    user.tokens_valid_after = now()  # and any session opened with the old password stops working
     audit.record(db, "Auth", "reset their password", actor_id=user.id, actor_label=user.username or user.full_name,
                  target_user_id=user.id, ip=_ip(request))
     db.commit()
