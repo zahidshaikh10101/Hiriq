@@ -13,7 +13,8 @@
     POST   /match/paste        {text}: score a job description you paste (one AI call reads it; nothing is stored)
 
 Your profile is the same candidate row recruiters see, but a recruiter finds it only while you have switched
-"visible to recruiters" on, and never sees your email, phone or links. Scores here always use the default weights.
+"visible to recruiters" on, and never sees your email, phone or links. Scores here use the standard weights without location (skills 42, qualification 21,
+experience 32, keywords 5), so where you live never changes your fit.
 Nothing here ever scores your name, gender, photo, college or age, and no step contacts a recruiter for you.
 """
 from __future__ import annotations
@@ -39,6 +40,9 @@ from app.db.recruiter_models import AiCall, Candidate, CandidateJobMatch, Job
 from app.db.session import get_db
 from app.routers.candidates import CandidateIn
 from app.routers.matches import _cand_sig, _cand_view, _job_view
+
+# The standard weights with location switched off (same proportions, re-spread to 100).
+CANDIDATE_WEIGHTS = {"skills": 42, "qualification": 21, "experience": 32, "location": 0, "keywords": 5}
 from app.services import jobread, llm, matching, resume, resume_text
 from app.services.timeutil import aware, now
 
@@ -267,7 +271,8 @@ def _fit(row: CandidateJobMatch | None, c: Candidate, job: Job, full: bool = Fal
         "required_total": len(req), "required_met": sum(1 for r in req if r["credit"] >= 1),
         "required_related": sum(1 for r in req if 0 < r["credit"] < 1), "missing_required": [r["skill"] for r in req if r["credit"] == 0],
         "summary": e.get("summary"), "computed_at": _iso(row.created_at),
-        "stale": e.get("cand_sig") != (csig or _cand_sig(c)) or e.get("job_sig") != _job_sig(job),
+        "stale": e.get("cand_sig") != (csig or _cand_sig(c)) or e.get("job_sig") != _job_sig(job)
+                 or b.get("weights") != CANDIDATE_WEIGHTS,
     }
     if full:
         out["explanation"] = e
@@ -287,7 +292,7 @@ def _get_open_job(db: Session, job_id: str) -> tuple[Job, User | None]:
 
 
 def _score_and_store(db: Session, c: Candidate, job: Job) -> CandidateJobMatch:
-    result = matching.score_candidate(_job_view(job), _cand_view(c), None, None)
+    result = matching.score_candidate(_job_view(job), _cand_view(c), CANDIDATE_WEIGHTS, None)
     explanation = dict(result["explanation"])
     explanation["cand_sig"] = _cand_sig(c)
     explanation["job_sig"] = _job_sig(job)
@@ -390,7 +395,7 @@ def _paste(db: Session, user: User, c: Candidate, text: str) -> dict:
     view = {"skills_required": read.skills_required, "skills_nice": read.skills_nice, "experience_min": read.experience_min,
             "experience_max": read.experience_max, "location": read.location, "work_mode": read.work_mode,
             "qualification": read.qualification, "text": "\n".join(x for x in (read.title, text) if x)}
-    result = matching.score_candidate(view, _cand_view(c), None, None)
+    result = matching.score_candidate(view, _cand_view(c), CANDIDATE_WEIGHTS, None)
     e, b = result["explanation"], result["breakdown"]
     req = e["skills"]["required"]
     return {

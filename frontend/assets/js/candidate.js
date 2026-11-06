@@ -288,7 +288,7 @@
     var e = m.explanation || {}, parts = m.parts || {}, sk = e.skills || { required: [], nice: [] };
     var cls = m.score >= 70 ? "strong" : m.score < 40 ? "low" : "";
     var met = sk.required.filter(function (r) { return r.credit >= 1; }).length;
-    var partRows = Object.keys(PART_LABEL).map(function (k) {
+    var partRows = Object.keys(PART_LABEL).filter(function (k) { return !parts[k] || parts[k].weight !== 0; }).map(function (k) {
       var p = parts[k] || {}, assessed = p.assessed, reason = k === "skills" ? (sk.required.length ? met + " of " + sk.required.length + " required skills found" : "") : ((e[k] && e[k].reason) || "");
       return '<div class="part' + (assessed ? "" : " off") + '"><div class="part-top"><strong>' + PART_LABEL[k] + ' <small>(' + (p.weight == null ? "" : p.weight + "%") + ')</small></strong><span class="mono">' +
         (assessed ? Math.round(p.score) : "not assessed") + '</span></div><div class="bar"><span style="width:' + (assessed ? Math.max(2, p.score) : 0) + '%"></span></div>' + (reason ? "<small>" + esc(reason) + "</small>" : "") + "</div>";
@@ -394,7 +394,7 @@
       (J.skills_nice.length ? '<div class="stack-2"><span class="card-sub">Nice to have</span><div class="chips-row">' + chips(J.skills_nice, 30) + "</div></div>" : "") +
       (J.qualification ? '<p style="margin:0" class="muted">Qualification: ' + esc(J.qualification) + "</p>" : "") +
       (J.description ? '<details><summary class="card-sub" style="cursor:pointer">Read the job description</summary><p style="white-space:pre-wrap;font-size:14px;line-height:1.6">' + esc(J.description) + "</p></details>" : "") + "</div>" +
-      '<div class="card card-stack" id="fit-card"><div class="row-between"><div class="stack-2"><h2 class="card-title">Your fit</h2>' + (fit ? '<span class="card-sub">Scored ' + ago(fit.computed_at) + ". Always with the standard weights: skills 40, qualification 20, experience 30, location 5, keywords 5.</span>" : "") +
+      '<div class="card card-stack" id="fit-card"><div class="row-between"><div class="stack-2"><h2 class="card-title">Your fit</h2>' + (fit ? '<span class="card-sub">Scored ' + ago(fit.computed_at) + ". Where you live is not scored. Weights: skills 42, qualification 21, experience 32, keywords 5.</span>" : "") +
       '</div><button type="button" class="btn btn-grad" id="match"' + (J.has_profile ? "" : " disabled") + ">" + (fit ? "Match again" : "Match me to this job") + "</button></div>" + matchBlock + "</div></div>";
     $("#match").addEventListener("click", function () {
       this.disabled = true;

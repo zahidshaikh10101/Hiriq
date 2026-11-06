@@ -439,6 +439,8 @@ def _summary(parts: dict, skills: dict, assessed_weight: int) -> str:
         bits.append(s)
     for key in ("qualification", "experience", "location", "keywords"):
         p = parts[key]
+        if p.get("weight") == 0:      # a part switched off is not talked about
+            continue
         bits.append(p["reason"] if p.get("reason") else "")
     text = ". ".join(b.rstrip(".") for b in bits if b) + "."
     if assessed_weight < 100:

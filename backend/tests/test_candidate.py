@@ -319,13 +319,25 @@ def test_matching_a_job_explains_the_fit_and_gaps(env):
     assert r.status_code == 200, r.text
     fit = r.json()["fit"]
     assert 0 < fit["score"] <= 100 and fit["required_total"] == 3 and fit["required_met"] == 2
-    assert fit["missing_required"] == ["Power BI"] and fit["stale"] is False and fit["weights"] == {"skills": 40, "qualification": 20, "experience": 30, "location": 5, "keywords": 5}
+    assert fit["missing_required"] == ["Power BI"] and fit["stale"] is False and fit["weights"] == {"skills": 42, "qualification": 21, "experience": 32, "location": 0, "keywords": 5}
     sql = next(x for x in fit["explanation"]["skills"]["required"] if x["skill"] == "SQL")
     assert sql["credit"] == 1 and "SQL" in sql["evidence"]
     assert fit["explanation"]["summary"] and fit["parts"]["skills"]["assessed"] is True
     listed = env.client.get(f"{ME}/jobs", headers=h).json()
     assert listed["scored"] == 1 and listed["jobs"][0]["fit"]["score"] == fit["score"] and "explanation" not in listed["jobs"][0]["fit"]
     assert env.client.get(f"{ME}/jobs/{job}", headers=h).json()["fit"]["explanation"]["summary"]
+
+
+def test_where_you_live_does_not_change_the_score(env):
+    _, h = ready(env)
+    rid = make_user(env, "r@example.com", role="recruiter")[0]
+    near = make_job(env, rid, title="Near", location="Mumbai")
+    far = make_job(env, rid, title="Far", location="Chennai")
+    a = env.client.post(f"{ME}/jobs/{near}/match", headers=h).json()["fit"]
+    b = env.client.post(f"{ME}/jobs/{far}/match", headers=h).json()["fit"]
+    assert a["score"] == b["score"]
+    assert a["parts"]["location"]["assessed"] is False and a["parts"]["location"]["weight"] == 0
+    assert a["assessed_weight"] == 100 and "ocation" not in a["summary"]
 
 
 def test_a_stored_score_goes_stale_when_you_or_the_job_change(env):
