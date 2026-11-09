@@ -337,7 +337,7 @@ def test_where_you_live_does_not_change_the_score(env):
     b = env.client.post(f"{ME}/jobs/{far}/match", headers=h).json()["fit"]
     assert a["score"] == b["score"]
     assert a["parts"]["location"]["assessed"] is False and a["parts"]["location"]["weight"] == 0
-    assert a["assessed_weight"] == 100 and "ocation" not in a["summary"]
+    assert a["assessed_weight"] == b["assessed_weight"] and "ocation" not in a["summary"]   # not 100: another part (keywords) may be unassessed
 
 
 def test_a_stored_score_goes_stale_when_you_or_the_job_change(env):

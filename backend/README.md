@@ -51,6 +51,16 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
 | GET | `/jobs`, `/jobs/{id}` | open jobs only (`?q=`), with your stored fit |
 | POST | `/jobs/match`, `/jobs/{id}/match` | score all open jobs / one job (rules only, standard weights) |
 | POST | `/match/paste` | `{text}`: match a pasted job description (15 AI reads/hour, not stored) |
+| POST | `/rewrite` | `{job_id}` or `{text}`: tailor your resume to a job. Only rewords your own lines; invented numbers or skills are dropped (rewrites, prep sets and letters share 12 a hour) |
+| GET | `/versions`, `/versions/{id}` | your saved tailored resumes (up to 20) |
+| PATCH, DELETE | `/versions/{id}` | rename, edit the text, or delete one |
+| POST | `/prep` | `{job_id}` or `{text}`: likely interview questions tied to your resume lines, stories, gaps, questions to ask |
+| GET, DELETE | `/preps`, `/preps/{id}` | saved prep sets (up to 20) |
+| POST | `/letters` | `{job_id}` or `{text}`, `tone`: a cover letter from your resume (invented numbers or skills are dropped) |
+| GET, PATCH, DELETE | `/letters`, `/letters/{id}` | saved letters (up to 20); rename or edit the text |
+| GET | `/letters/{id}/pdf` | the letter as a PDF download |
+| GET | `/recommendations` | open jobs ranked by your fit, with why and what is missing (`?min_score=&work_mode=&limit=`) |
+| GET | `/external/status`, `/external` | outside job feed (JSearch): `?q=&location=&page=`; needs `RAPIDAPI_KEY`; shows which of your skills each post mentions |
 
 **Admin** (`/api/admin`, admin role)
 

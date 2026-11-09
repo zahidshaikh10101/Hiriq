@@ -7,6 +7,7 @@ What it does today:
  - users.date_of_birth and users.tokens_valid_after (new columns)
  - otp_codes accepts the purpose 'reset' (forgot password) as well as 'signup'
  - candidates.visible_to_recruiters (new column, default false: members opt in) and candidate_job_matches (new table)
+ - resume_versions, interview_preps and cover_letters (new tables): saved tailored resumes, interview prep, cover letters
  - pending_signups (new table): an unverified sign-up now waits there instead of in `users`
    Old half-finished sign-ups left in `users` (never verified, no Google link, never signed in) are removed, because
    their password could have been set by someone other than the email's owner.

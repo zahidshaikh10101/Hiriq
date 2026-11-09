@@ -164,6 +164,7 @@ CREATE TABLE candidates (
 	resume_text TEXT, 
 	file_name VARCHAR(255), 
 	file_hash VARCHAR(64), 
+	visible_to_recruiters BOOLEAN DEFAULT false NOT NULL, 
 	is_demo BOOLEAN DEFAULT false NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	PRIMARY KEY (id), 
@@ -223,6 +224,56 @@ CREATE TABLE otp_codes (
 );
 
 CREATE INDEX ix_otp_destination_created ON otp_codes (destination, created_at);
+
+CREATE TABLE candidate_job_matches (
+	id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	job_id UUID NOT NULL, 
+	score FLOAT NOT NULL, 
+	breakdown JSONB, 
+	explanation JSONB, 
+	model_version VARCHAR(40), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_cmatch_candidate_job UNIQUE (candidate_id, job_id), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_cmatch_candidate_score ON candidate_job_matches (candidate_id, score);
+
+CREATE TABLE cover_letters (
+	id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	job_id UUID, 
+	job_title VARCHAR(200), 
+	label VARCHAR(120) NOT NULL, 
+	tone VARCHAR(20) DEFAULT 'professional' NOT NULL, 
+	text TEXT NOT NULL, 
+	content JSONB NOT NULL, 
+	model VARCHAR(80), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_cover_letters_candidate_created ON cover_letters (candidate_id, created_at);
+
+CREATE TABLE interview_preps (
+	id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	job_id UUID, 
+	job_title VARCHAR(200), 
+	content JSONB NOT NULL, 
+	model VARCHAR(80), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_interview_preps_candidate_created ON interview_preps (candidate_id, created_at);
 
 CREATE TABLE job_matches (
 	id UUID NOT NULL, 
@@ -292,6 +343,25 @@ CREATE TABLE recruiter_events (
 );
 
 CREATE INDEX ix_recruiter_events_owner_created ON recruiter_events (owner_id, created_at);
+
+CREATE TABLE resume_versions (
+	id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	job_id UUID, 
+	job_title VARCHAR(200), 
+	label VARCHAR(120) NOT NULL, 
+	content JSONB NOT NULL, 
+	text TEXT NOT NULL, 
+	score_before FLOAT, 
+	score_after FLOAT, 
+	model VARCHAR(80), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_resume_versions_candidate_created ON resume_versions (candidate_id, created_at);
 
 INSERT INTO plans (id, name, live) VALUES
   ('free','Free',true),('basic','Basic',false),('pro','Pro',false),('premium','Premium',false)

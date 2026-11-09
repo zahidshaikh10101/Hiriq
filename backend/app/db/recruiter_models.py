@@ -143,6 +143,59 @@ class CandidateJobMatch(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class ResumeVersion(Base):
+    """A saved tailored copy of a member's resume for one job. The original resume is never changed.
+    `job_id` is empty for a pasted job description and when the job is later deleted; `job_title` keeps the label."""
+
+    __tablename__ = "resume_versions"
+    __table_args__ = (Index("ix_resume_versions_candidate_created", "candidate_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
+    job_title: Mapped[str | None] = mapped_column(String(200))
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    content: Mapped[dict] = mapped_column(Json, nullable=False)        # summary, rewrites, skills_first, gaps, dropped
+    text: Mapped[str] = mapped_column(Text, nullable=False)            # the tailored resume text (the person can edit it)
+    score_before: Mapped[float | None] = mapped_column(Float)
+    score_after: Mapped[float | None] = mapped_column(Float)
+    model: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class InterviewPrep(Base):
+    """A saved interview-prep set for one job: likely questions tied to the member's own resume lines."""
+
+    __tablename__ = "interview_preps"
+    __table_args__ = (Index("ix_interview_preps_candidate_created", "candidate_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
+    job_title: Mapped[str | None] = mapped_column(String(200))
+    content: Mapped[dict] = mapped_column(Json, nullable=False)        # questions, stories, ask_them, gaps, dropped
+    model: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class CoverLetter(Base):
+    """A saved cover letter for one job. `text` is the whole letter and the member can edit it; the PDF is made from it on request."""
+
+    __tablename__ = "cover_letters"
+    __table_args__ = (Index("ix_cover_letters_candidate_created", "candidate_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
+    job_title: Mapped[str | None] = mapped_column(String(200))
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    tone: Mapped[str] = mapped_column(String(20), nullable=False, server_default="professional")
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[dict] = mapped_column(Json, nullable=False)        # dropped paragraphs and why
+    model: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class PipelineEntry(Base):
     """Where a candidate stands for a job. `reached` is the furthest stage index, so the funnel survives a rejection."""
 
