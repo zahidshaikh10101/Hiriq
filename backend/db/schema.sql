@@ -307,6 +307,28 @@ CREATE TABLE match_feedback (
 	FOREIGN KEY(recruiter_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
+CREATE TABLE applications (
+	id UUID NOT NULL, 
+	job_id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	resume_label VARCHAR(120) NOT NULL, 
+	resume_text TEXT NOT NULL, 
+	letter_label VARCHAR(120), 
+	letter_text TEXT, 
+	message TEXT, 
+	contact JSONB NOT NULL, 
+	fit_score FLOAT, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_application_job_candidate UNIQUE (job_id, candidate_id), 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE, 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_applications_job_created ON applications (job_id, created_at);
+
+CREATE INDEX ix_applications_candidate_created ON applications (candidate_id, created_at);
+
 CREATE TABLE pipeline_entries (
 	id UUID NOT NULL, 
 	job_id UUID NOT NULL, 

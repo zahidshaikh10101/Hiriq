@@ -7,7 +7,8 @@ Every route needs a signed-in recruiter.
     DELETE /jobs/{id}/pipeline/{cand_id}            take a candidate off the board (their history on this job goes with them)
     PUT    /jobs/{id}/matches/{cand_id}/feedback    thumbs up (1), thumbs down (-1) or clear (0) on a match
 
-Scope: your own job, and candidates from your own pool (your uploads plus active Hiriq members), nothing else.
+Scope: your own job, and candidates from your own pool (your uploads plus active Hiriq members), plus anyone who applied to your jobs, nothing else.
+An applicant is offered on the board of the job they applied to (and can be opened from the Applicants page); nobody is added automatically.
 Nobody is ever moved automatically: every stage change here is a recruiter's own click.
 `reached` remembers the furthest stage a candidate got to, so the Overview funnel still counts someone after a rejection
 or after they are moved back a step. Thumbs are stored as labels for training the ranker later; they never change a score today.
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_recruiter
 from app.db.models import User
-from app.db.recruiter_models import PIPELINE_STAGES, STAGES, Candidate, Job, JobMatch, MatchFeedback, PipelineEntry, RecruiterEvent
+from app.db.recruiter_models import PIPELINE_STAGES, STAGES, Application, Candidate, Job, JobMatch, MatchFeedback, PipelineEntry, RecruiterEvent
 from app.db.session import get_db
 from app.routers.candidates import _find, _members_visible, _sync_members  # the pool rules live in one place
 from app.services.timeutil import aware
@@ -105,13 +106,16 @@ def _counts(entries: list[PipelineEntry]) -> dict:
 
 def _board(db: Session, actor: User, job: Job) -> dict:
     pool = _pool(db, actor)
-    entries = [e for e in db.scalars(select(PipelineEntry).where(PipelineEntry.job_id == job.id)).all() if e.candidate_id in pool]
+    people = dict(pool)    # the pool, plus whoever applied to THIS job (they are not offered for other jobs)
+    for c in db.scalars(select(Candidate).join(Application, Application.candidate_id == Candidate.id).where(Application.job_id == job.id)).all():
+        people[c.id] = c
+    entries = [e for e in db.scalars(select(PipelineEntry).where(PipelineEntry.job_id == job.id)).all() if e.candidate_id in people]
     scores = dict(db.execute(select(JobMatch.candidate_id, JobMatch.score).where(JobMatch.job_id == job.id)).all())
     labels = dict(db.execute(
         select(MatchFeedback.candidate_id, MatchFeedback.label).where(MatchFeedback.job_id == job.id, MatchFeedback.recruiter_id == actor.id)
     ).all())
 
-    cards = [_card(e, pool[e.candidate_id], scores.get(e.candidate_id), labels.get(e.candidate_id)) for e in entries]
+    cards = [_card(e, people[e.candidate_id], scores.get(e.candidate_id), labels.get(e.candidate_id)) for e in entries]
     by_stage = {s: sorted((c for c in cards if c["stage"] == s), key=_sort_key) for s in PIPELINE_STAGES}
 
     on_board = {e.candidate_id for e in entries}

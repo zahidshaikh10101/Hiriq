@@ -37,6 +37,9 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
 | GET, POST | `/jobs/{id}/pipeline` | the stage board; add candidates |
 | PATCH, DELETE | `/jobs/{id}/pipeline/{candidate_id}` | move or annotate; take off the board |
 | PUT | `/jobs/{id}/matches/{candidate_id}/feedback` | thumbs up (1), down (-1) or clear (0) |
+| GET | `/applicants` | your jobs with how many people applied |
+| GET | `/jobs/{id}/applicants` | who applied to one job (`?sort=new\|fit`), with fit score and pipeline stage |
+| GET | `/jobs/{id}/applicants/{application_id}` | one application in full: contact details, the resume and letter sent, their message. Add them to the pipeline with `POST /jobs/{id}/pipeline` |
 | POST | `/ask` | question about the pool, answered from the resumes with checked quotes |
 
 **Candidate** (`/api/candidate`, candidate role)
@@ -60,6 +63,9 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
 | GET, PATCH, DELETE | `/letters`, `/letters/{id}` | saved letters (up to 20); rename or edit the text |
 | GET | `/letters/{id}/pdf` | the letter as a PDF download |
 | GET | `/recommendations` | open jobs ranked by your fit, with why and what is missing (`?min_score=&work_mode=&limit=`) |
+| POST | `/jobs/{id}/apply` | `{version_id?, letter_id?, message?}`: apply to an open job. The recruiter gets a copy of the resume text you pick (uploaded or a tailored version), the letter, your message, your contact details and your fit score. 409 if you already applied |
+| GET | `/applications` | your applications, newest first |
+| DELETE | `/applications/{id}` | withdraw: the copy the recruiter had is deleted (removing your resume withdraws them all) |
 | GET | `/external/status`, `/external` | outside job feed (JSearch): `?q=&location=&page=`; needs `RAPIDAPI_KEY`; shows which of your skills each post mentions |
 
 **Admin** (`/api/admin`, admin role)

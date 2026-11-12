@@ -196,6 +196,32 @@ class CoverLetter(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class Application(Base):
+    """A candidate's application to one open job. Applying is the one moment a member shares their details with a recruiter,
+    so everything the recruiter sees is a snapshot taken then: the resume text sent (original or a tailored version), the
+    cover letter if any, a short message, and the contact details. Later edits or deletions of the originals change nothing here.
+    Withdrawing deletes the row, so the recruiter's access ends with it."""
+
+    __tablename__ = "applications"
+    __table_args__ = (
+        UniqueConstraint("job_id", "candidate_id", name="uq_application_job_candidate"),
+        Index("ix_applications_job_created", "job_id", "created_at"),
+        Index("ix_applications_candidate_created", "candidate_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    resume_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    resume_text: Mapped[str] = mapped_column(Text, nullable=False)
+    letter_label: Mapped[str | None] = mapped_column(String(120))
+    letter_text: Mapped[str | None] = mapped_column(Text)
+    message: Mapped[str | None] = mapped_column(Text)
+    contact: Mapped[dict] = mapped_column(Json, nullable=False)          # email, phone, location, linkedin_url, github_url, portfolio_url
+    fit_score: Mapped[float | None] = mapped_column(Float)              # standard weights, scored when the member applied
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class PipelineEntry(Base):
     """Where a candidate stands for a job. `reached` is the furthest stage index, so the funnel survives a rejection."""
 

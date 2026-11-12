@@ -3,7 +3,7 @@
     GET    /me                 your profile, the resume state and whether recruiters can see you
     POST   /resume             upload ONE resume (the raw file as the request body, name in X-Filename); the AI reads it
     PUT    /profile            correct what the reader got wrong, or fill the profile by hand
-    DELETE /resume             remove your resume and profile details (and hide you from recruiters)
+    DELETE /resume             remove your resume and profile details (hides you from recruiters and withdraws your applications)
     PUT    /visibility         {visible: true|false}: let recruiters find you, or not (default: not)
     GET    /insights           profile completeness, skills with evidence, experience, and the skills open jobs ask for
     GET    /jobs               open jobs, with your fit when you have scored one (?q=&limit=&offset=)
@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_candidate
 from app.db.models import User
-from app.db.recruiter_models import AiCall, Candidate, CandidateJobMatch, Job
+from app.db.recruiter_models import AiCall, Application, Candidate, CandidateJobMatch, Job
 from app.db.session import get_db
 from app.routers.candidates import CandidateIn
 from app.routers.matches import _cand_sig, _cand_view, _job_view
@@ -212,6 +212,8 @@ def delete_resume(actor: User = Depends(require_candidate), db: Session | None =
     c.visible_to_recruiters = False
     for row in db.scalars(select(CandidateJobMatch).where(CandidateJobMatch.candidate_id == c.id)).all():
         db.delete(row)
+    for row in db.scalars(select(Application).where(Application.candidate_id == c.id)).all():
+        db.delete(row)                 # your details leave with your resume: recruiters lose the copy you sent them
     db.commit()
     return _mine(c, actor)
 

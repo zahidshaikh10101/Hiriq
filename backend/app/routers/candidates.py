@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_recruiter
 from app.db.models import User
-from app.db.recruiter_models import AiCall, Candidate, RecruiterEvent
+from app.db.recruiter_models import AiCall, Application, Candidate, Job, RecruiterEvent
 from app.db.session import get_db
 from app.services import llm, resume, resume_text
 from app.services.timeutil import aware, now
@@ -93,6 +93,10 @@ def _find(db: Session, actor: User, candidate_id: str) -> Candidate:
         u = db.get(User, c.user_id)
         if u is not None and u.role == "candidate" and u.status == "active" and u.email_verified:
             return c
+    applied = db.scalar(select(func.count()).select_from(Application).join(Job, Job.id == Application.job_id)
+                        .where(Application.candidate_id == c.id, Job.owner_id == actor.id))
+    if applied:                        # they applied to one of this recruiter's jobs, so this recruiter may see them
+        return c
     raise _err(404, "not_found", "That candidate does not exist.")
 
 
