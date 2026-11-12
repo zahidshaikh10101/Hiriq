@@ -536,3 +536,6 @@ textarea.desc { min-height: 420px; font-size: 14.5px; }
   .m-head { flex-wrap: wrap; }
   .m-badges { order: 5; flex-basis: 100%; justify-content: flex-start; padding-left: 42px; }
 }
+
+/* Applicants: the resume and letter a candidate sent, shown as plain text */
+.doc-view { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 520px; overflow: auto; padding: 14px 16px; border-radius: 14px; background: rgb(255 255 255 / 0.04); border: 1px solid rgb(255 255 255 / 0.07); font-size: 13.5px; line-height: 1.6; }

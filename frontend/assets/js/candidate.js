@@ -1,7 +1,8 @@
 /* Hiriq — candidate workspace. Live data from the backend (/api/candidate/*).
    Views are chosen by the URL hash: #profile #insights #jobs #jobs/<id>.
    Profile (resume upload, edit, who can see you), Insights (what your resume shows and what open jobs ask for) and
-   Jobs & match (open jobs, your fit with the reasons, and a match for any job description you paste) are live.
+   Jobs & match (open jobs, your fit with the reasons, a match for any job description you paste, and Apply) are live.
+   Apply and the Applications page are in candidate-apply.js.
    Nothing here is estimated: a part the resume cannot answer is shown as "not assessed", never as zero. */
 (function () {
   var view = document.getElementById("view");
@@ -65,6 +66,14 @@
       return r;
     });
   }
+  // Long AI work: show the loader (preview, timer, tips, tick list). Falls back to a plain notice if the loader script is missing.
+  function work(container, kind, onCancel) {
+    if (!window.HiriqCandLoader) { container.innerHTML = notice("info", "Working on it. This can take up to a minute…"); return { cancelled: false, stop: function () {} }; }
+    return window.HiriqCandLoader.start({ container: container, kind: kind, onCancel: function () {
+      container.innerHTML = notice("info", "Cancelled. The request may still count toward your hourly limit.");
+      if (onCancel) onCancel();
+    } });
+  }
   var navId = 0;   // a newer navigation cancels slower responses from an older one
 
   // =====================================================
@@ -107,7 +116,7 @@
     view.innerHTML = '<div class="view">' + header("My profile", LIVE) + '<div id="msg" aria-live="polite">' + (note ? notice(note[0], note[1]) : "") + "</div>" +
       '<div class="card card-stack"><div class="stack-2"><h2 class="card-title">Your resume</h2></div>' + resumeLine + dz + "</div>" +
       '<div class="card card-stack"><div class="switch-row"><div class="stack-2"><h2 class="card-title">Visible to recruiters</h2>' +
-      '<span class="card-sub">Off by default. When on, recruiters can find you by title, skills and experience. They never see your email, phone or links.</span></div>' +
+      '<span class="card-sub">Off by default. When on, recruiters can find you by title, skills and experience. They never see your email, phone or links unless you apply to their job.</span></div>' +
       '<button type="button" role="switch" class="switch" id="vis" aria-checked="' + !!me.visible_to_recruiters + '" aria-label="Visible to recruiters"' + (canShow ? "" : " disabled") + "></button></div>" +
       (canShow ? "" : '<p class="privacy-note">Add your resume or some skills first. Then you can choose to be found.</p>') + "</div>" +
       '<div class="card card-stack" id="profile-card"><div class="row-between"><h2 class="card-title">Profile details</h2><button type="button" class="btn-link" id="btn-edit">Edit</button></div>' + profileSummary(me) + "</div>" +
@@ -121,7 +130,7 @@
     dzEl.addEventListener("drop", function (e) { var f = e.dataTransfer && e.dataTransfer.files[0]; if (f) upload(f); });
     var rm = $("#remove");
     if (rm) rm.addEventListener("click", function () {
-      if (!window.confirm("Remove your resume and profile details? You will also be hidden from recruiters.")) return;
+      if (!window.confirm("Remove your resume and profile details? You will also be hidden from recruiters, and any applications you sent are withdrawn.")) return;
       api("DELETE", "/api/candidate/resume").then(function (r) { r.ok ? drawProfile(r.data, ["good", "Your resume was removed."]) : ($("#msg").innerHTML = notice("error", explain(r))); });
     });
     $("#vis").addEventListener("click", function () {
@@ -140,13 +149,9 @@
       : !OK_EXT.test(file.name) ? "Only PDF, Word (.docx) and text files are supported."
       : !file.size ? "This file is empty." : file.size > MAX_BYTES ? "This file is larger than 5 MB." : "";
     if (problem) { msg.innerHTML = notice("error", problem); return; }
-    var started = Date.now();
-    msg.innerHTML = notice("info", "Reading your resume… 0 s");
-    var tick = setInterval(function () {
-      var el = $("#msg span"); if (el) el.textContent = "Reading your resume… " + Math.round((Date.now() - started) / 1000) + " s"; else clearInterval(tick);
-    }, 1000);
     var s = window.HiriqAuth.current();
-    if (!s) { clearInterval(tick); window.HiriqAuth.logout(); return; }
+    if (!s) { window.HiriqAuth.logout(); return; }
+    var loader = work(msg, "upload");
     fetch(cfg.apiBase + "/api/candidate/resume", {
       method: "POST",
       headers: { Authorization: "Bearer " + s.token, "X-Filename": encodeURIComponent(file.name), "Content-Type": "application/octet-stream" },
@@ -156,7 +161,8 @@
     }).catch(function () {
       return { ok: false, status: 0, data: {}, error: "Could not reach the backend. Is it running?" };
     }).then(function (r) {
-      clearInterval(tick);
+      if (loader.cancelled) return;
+      loader.stop();
       if (r.status === 401) { window.HiriqAuth.logout(); return; }
       if (!r.ok) {
         var d = r.data && r.data.detail;
@@ -358,8 +364,9 @@
     $("#paste-go").addEventListener("click", function () {
       var btn = this, out = $("#paste-out");
       btn.disabled = true;
-      out.innerHTML = notice("info", "Reading the job description…");
+      var loader = work(out, "paste", function () { btn.disabled = false; });
       api("POST", "/api/candidate/match/paste", { text: $("#paste").value }).then(function (r) {
+        if (loader.cancelled) return;
         btn.disabled = false;
         if (!r.ok) { out.innerHTML = notice("error", explain(r)); return; }
         var d = r.data, rd = d.read || {};
@@ -393,9 +400,15 @@
       '<div class="stack-2"><span class="card-sub">Required skills</span><div class="chips-row">' + chips(J.skills_required, 30, "chip-cyan") + "</div></div>" +
       (J.skills_nice.length ? '<div class="stack-2"><span class="card-sub">Nice to have</span><div class="chips-row">' + chips(J.skills_nice, 30) + "</div></div>" : "") +
       (J.qualification ? '<p style="margin:0" class="muted">Qualification: ' + esc(J.qualification) + "</p>" : "") +
+      (J.has_profile ? '<p style="margin:0"><a class="btn-link" href="#resume" id="tailor-link">Tailor my resume</a> · <a class="btn-link" href="#prep" id="prep-link">Prepare for the interview</a> · <a class="btn-link" href="#letters" id="letter-link">Write a cover letter</a></p>' : "") +
       (J.description ? '<details><summary class="card-sub" style="cursor:pointer">Read the job description</summary><p style="white-space:pre-wrap;font-size:14px;line-height:1.6">' + esc(J.description) + "</p></details>" : "") + "</div>" +
       '<div class="card card-stack" id="fit-card"><div class="row-between"><div class="stack-2"><h2 class="card-title">Your fit</h2>' + (fit ? '<span class="card-sub">Scored ' + ago(fit.computed_at) + ". Where you live is not scored. Weights: skills 42, qualification 21, experience 32, keywords 5.</span>" : "") +
-      '</div><button type="button" class="btn btn-grad" id="match"' + (J.has_profile ? "" : " disabled") + ">" + (fit ? "Match again" : "Match me to this job") + "</button></div>" + matchBlock + "</div></div>";
+      '</div><button type="button" class="btn btn-grad" id="match"' + (J.has_profile ? "" : " disabled") + ">" + (fit ? "Match again" : "Match me to this job") + "</button></div>" + matchBlock + "</div>" +
+      '<div id="job-actions"></div></div>';
+    if (apply) apply.jobActions(J, $("#job-actions"));
+    var tl = $("#tailor-link");
+    if (tl) tl.addEventListener("click", function () { preselectJob = J.id; });
+    ["prep-link", "letter-link"].forEach(function (id) { var a = document.getElementById(id); if (a) a.addEventListener("click", function () { DOC_PRESELECT = J.id; }); });
     $("#match").addEventListener("click", function () {
       this.disabled = true;
       api("POST", "/api/candidate/jobs/" + encodeURIComponent(J.id) + "/match").then(function (r) {
@@ -405,13 +418,395 @@
     });
   }
 
+
+  // =====================================================
+  // TAILOR RESUME
+  // =====================================================
+  var preselectJob = "";
+  var REWRITE_ERR = { no_resume: "Upload your resume on My profile first. Tailoring rewords lines you already wrote." };
+
+  function renderResume() {
+    var mine = ++navId;
+    loading("Tailor resume");
+    Promise.all([api("GET", "/api/candidate/versions"), api("GET", "/api/candidate/jobs")]).then(function (rs) {
+      if (mine !== navId) return;
+      if (!rs[0].ok) { failure("Tailor resume", rs[0].error); return; }
+      drawResume(rs[0].data, rs[1].ok ? rs[1].data.jobs : []);
+    });
+  }
+
+  function drawResume(D, jobs) {
+    var opts = jobs.map(function (j) { return '<option value="' + esc(j.id) + '">' + esc(j.title + (j.company ? " · " + j.company : "")) + "</option>"; }).join("");
+    var noResume = D.has_resume ? "" : notice("info", REWRITE_ERR.no_resume);
+    var list = D.versions.length
+      ? '<ul class="skill-rows">' + D.versions.map(function (v) {
+        return '<li class="skill-row"><span class="skill-main"><strong><a href="#resume/' + esc(v.id) + '">' + esc(v.label) + "</a></strong><small class=\"faint\">" +
+          ago(v.created_at) + " · " + v.rewrites + " line" + (v.rewrites === 1 ? "" : "s") + " reworded" + "</small></span>" +
+          '<span class="mono">' + (v.score_before == null ? "" : Math.round(v.score_before) + " → " + Math.round(v.score_after)) + "</span></li>";
+      }).join("") + "</ul>"
+      : '<p class="empty-inline">No tailored resumes yet.</p>';
+    view.innerHTML = '<div class="view">' + header("Tailor resume", LIVE) + '<div id="msg" aria-live="polite">' + noResume + "</div>" +
+      '<div class="card card-stack"><h2 class="card-title">Tailor to a job</h2>' +
+      '<p class="privacy-note">The AI only rewords lines you already wrote. It cannot add a number, tool or result your resume does not have, and anything that does is thrown away. Your original resume is never changed.</p>' +
+      '<div class="field-group"><label class="label" for="t-job">An open job on Hiriq</label><select class="field field-sm" id="t-job"><option value="">Choose a job</option>' + opts + "</select></div>" +
+      '<div class="field-group"><label class="label" for="t-text">…or paste a job description</label><textarea class="field paste-box" id="t-text" maxlength="12000" placeholder="Paste the whole post"></textarea></div>' +
+      '<div class="actions-bar"><button type="button" class="btn btn-grad" id="t-go"' + (D.has_resume ? "" : " disabled") + ">Tailor my resume</button></div></div>" +
+      '<div class="card card-stack"><div class="row-between"><h2 class="card-title">Saved versions</h2><span class="faint" style="font-size:13px">' + D.versions.length + " of " + D.max + "</span></div>" + list + "</div></div>";
+    if (preselectJob) { $("#t-job").value = preselectJob; preselectJob = ""; }
+    $("#t-go").addEventListener("click", function () {
+      var jobId = $("#t-job").value, text = $("#t-text").value.trim();
+      var body = jobId && !text ? { job_id: jobId } : !jobId && text ? { text: text } : null;
+      if (!body) { $("#msg").innerHTML = notice("error", "Choose an open job, or paste a job description, not both."); return; }
+      var btn = this; btn.disabled = true;
+      var loader = work($("#msg"), "tailor", function () { btn.disabled = false; });
+      api("POST", "/api/candidate/rewrite", body).then(function (r) {
+        if (loader.cancelled) return;
+        if (!r.ok) { btn.disabled = false; $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+        window.location.hash = "#resume/" + r.data.id;
+      });
+    });
+  }
+
+  function renderVersion(id) {
+    var mine = ++navId;
+    loading("Tailored resume");
+    api("GET", "/api/candidate/versions/" + encodeURIComponent(id)).then(function (r) {
+      if (mine !== navId) return;
+      if (!r.ok) { failure("Tailored resume", r.status === 404 ? "That version does not exist." : r.error); return; }
+      drawVersion(r.data);
+    });
+  }
+
+  function drawVersion(V) {
+    var c = V.content || {};
+    var rewrites = (c.rewrites || []).length
+      ? '<ul class="rewrite-list">' + c.rewrites.map(function (w) {
+        return '<li class="rewrite"><span class="was">' + esc(w.original) + '</span><span class="now">' + esc(w.rewritten) + "</span>" + (w.why ? "<small>" + esc(w.why) + "</small>" : "") + "</li>";
+      }).join("") + "</ul>"
+      : '<p class="empty-inline">No line could be reworded safely for this job, so the text is your resume as it was.</p>';
+    var dropped = (c.dropped || []).length
+      ? '<p class="privacy-note">' + c.dropped.length + " suggestion" + (c.dropped.length === 1 ? " was" : "s were") + " thrown away because they did not stick to your resume: " +
+        c.dropped.map(function (d) { return esc(d.reason); }).filter(function (x, i, a) { return a.indexOf(x) === i; }).join("; ") + ".</p>" : "";
+    var scores = V.score_before == null ? "" : '<div class="score-pair"><span class="mono">' + Math.round(V.score_before) + " → " + Math.round(V.score_after) +
+      '</span><small class="faint">fit with this job, before and after. Most of your fit comes from your listed skills, so wording changes it only a little.</small></div>';
+    view.innerHTML = '<div class="view">' + header(V.label, LIVE) + '<p style="margin:0"><a class="btn-link" href="#resume">Back to tailored resumes</a></p><div id="msg" aria-live="polite"></div>' +
+      '<div class="card card-stack">' + scores +
+      (c.summary ? '<div class="stack-2"><span class="card-sub">Suggested summary</span><p style="margin:0">' + esc(c.summary) + "</p></div>" : "") +
+      ((c.skills_first || []).length ? '<div class="stack-2"><span class="card-sub">Put these skills first</span><div class="chips-row">' + chips(c.skills_first, 12, "chip-cyan") + "</div></div>" : "") + "</div>" +
+      '<div class="card card-stack"><h2 class="card-title">Lines reworded</h2>' + rewrites + dropped + "</div>" +
+      ((c.gaps || []).length ? '<div class="card card-stack"><h2 class="card-title">This job wants these, your resume does not show them</h2><div class="chips-row">' + chips(c.gaps, 20, "chip-neutral") +
+        '</div><p class="privacy-note">Add one only if it is true: learn it, or point to where you have used it. It is never written in for you.</p></div>' : "") +
+      '<div class="card card-stack"><div class="row-between"><h2 class="card-title">Tailored resume text</h2><span class="actions-bar"><button type="button" class="btn btn-outline" id="v-copy">Copy</button>' +
+      '<button type="button" class="btn btn-outline" id="v-dl">Download .txt</button></span></div>' +
+      '<textarea class="field resume-edit" id="v-text" maxlength="30000" aria-label="Tailored resume text">' + esc(V.text) + "</textarea>" +
+      '<div class="actions-bar"><button type="button" class="btn btn-grad" id="v-save">Save edits</button></div></div>' +
+      '<div class="card card-stack"><div class="field-group"><label class="label" for="v-label">Name</label><input class="field field-sm" id="v-label" maxlength="120" value="' + esc(V.label) + '"></div>' +
+      '<div class="actions-bar"><button type="button" class="btn btn-outline" id="v-rename">Rename</button><button type="button" class="btn-link" id="v-del">Delete this version</button></div></div></div>';
+    function patch(body, ok) {
+      api("PATCH", "/api/candidate/versions/" + encodeURIComponent(V.id), body).then(function (r) {
+        if (!r.ok) { $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+        V = r.data; $("#msg").innerHTML = notice("good", ok);
+      });
+    }
+    $("#v-save").addEventListener("click", function () { patch({ text: $("#v-text").value }, "Saved."); });
+    $("#v-rename").addEventListener("click", function () { patch({ label: $("#v-label").value }, "Renamed."); });
+    $("#v-copy").addEventListener("click", function () {
+      var t = $("#v-text").value;
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { $("#msg").innerHTML = notice("good", "Copied."); },
+        function () { $("#v-text").select(); $("#msg").innerHTML = notice("info", "Select all and copy with Ctrl+C."); });
+    });
+    $("#v-dl").addEventListener("click", function () {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([$("#v-text").value], { type: "text/plain" }));
+      a.download = (V.label || "resume").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") + ".txt";
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+    $("#v-del").addEventListener("click", function () {
+      if (!window.confirm("Delete this tailored resume? Your original resume stays.")) return;
+      api("DELETE", "/api/candidate/versions/" + encodeURIComponent(V.id)).then(function (r) { r.ok ? (window.location.hash = "#resume") : ($("#msg").innerHTML = notice("error", explain(r))); });
+    });
+  }
+
+
+  // =====================================================
+  // RECOMMENDED (open Hiriq jobs, best fit first)
+  // =====================================================
+  var recMin = "30", recMode = "";
+
+  function renderRecommended() {
+    var mine = ++navId;
+    loading("Recommended");
+    var qs = "?min_score=" + encodeURIComponent(recMin) + (recMode ? "&work_mode=" + encodeURIComponent(recMode) : "");
+    api("GET", "/api/candidate/recommendations" + qs).then(function (r) {
+      if (mine !== navId) return;
+      if (r.status === 409) {
+        view.innerHTML = '<div class="view">' + header("Recommended", LIVE) + notice("info", "Add your resume or some skills on My profile first, then we can suggest jobs.") + '<p><a class="btn btn-grad" href="#profile">Go to My profile</a></p></div>';
+        return;
+      }
+      if (!r.ok) { failure("Recommended", r.error); return; }
+      drawRecommended(r.data);
+    });
+  }
+
+  function recCard(j) {
+    var f = j.fit;
+    return '<article class="card job-card"><div class="stack-2" style="flex:1;min-width:240px"><h3><a href="#jobs/' + esc(j.id) + '">' + esc(j.title) + '</a></h3><div class="job-meta">' + jobMeta(j) + "</div>" +
+      '<p class="rec-why">' + esc(j.reason) + "</p>" +
+      (j.matched.length ? '<div class="chips-row"><small class="faint">You have</small> ' + chips(j.matched, 6, "chip-cyan") + "</div>" : "") +
+      (j.gaps.length ? '<div class="chips-row"><small class="faint">To build</small> ' + chips(j.gaps, 4, "chip-neutral") + "</div>" : "") + "</div>" +
+      '<div class="fit-side"><span class="score-chip' + (f.score >= 70 ? " strong" : "") + '">' + f.score + '</span><small class="faint">of 100</small>' +
+      '<a class="btn btn-outline" href="#jobs/' + esc(j.id) + '" style="min-height:38px">See why</a></div></article>';
+  }
+
+  function drawRecommended(D) {
+    var list = D.recommended.length ? '<div class="job-list">' + D.recommended.map(recCard).join("") + "</div>"
+      : '<div class="card"><p class="empty-inline">' + (D.considered ? "No open jobs reach that fit yet. Lower the minimum fit, or add skills on My profile." : "No open jobs with listed skills yet. Check back soon, or search outside jobs.") + "</p></div>";
+    view.innerHTML = '<div class="view">' + header("Recommended", LIVE) +
+      '<div class="toolbar"><label class="faint" style="font-size:13px" for="r-min">Show fit of at least</label><select class="field field-sm" id="r-min" style="max-width:110px">' +
+      ["0", "30", "50", "70"].map(function (v) { return '<option value="' + v + '"' + (String(D.min_score) === v ? " selected" : "") + ">" + v + "</option>"; }).join("") + "</select>" +
+      '<select class="field field-sm" id="r-mode" style="max-width:150px" aria-label="Work mode"><option value="">Any work mode</option>' +
+      ["onsite", "hybrid", "remote"].map(function (v) { return '<option value="' + v + '"' + (recMode === v ? " selected" : "") + ">" + v + "</option>"; }).join("") + "</select>" +
+      '<span class="faint" style="font-size:13px">' + D.considered + " open jobs checked · " + D.strong + " strong" + (D.hidden_below ? " · " + D.hidden_below + " below your minimum" : "") + "</span></div>" + list +
+      '<p class="privacy-note">Ranked by skills, qualification and experience from your resume. Where you live and your name are not scored.</p></div>';
+    $("#r-min").addEventListener("change", function () { recMin = this.value; renderRecommended(); });
+    $("#r-mode").addEventListener("change", function () { recMode = this.value; renderRecommended(); });
+  }
+
+  // =====================================================
+  // SEARCH OUTSIDE JOBS
+  // =====================================================
+  var extState = { q: "", loc: "", result: null };
+
+  function renderSearch() {
+    var mine = ++navId;
+    loading("Search outside jobs");
+    Promise.all([api("GET", "/api/candidate/external/status"), api("GET", "/api/candidate/me")]).then(function (rs) {
+      if (mine !== navId) return;
+      if (!rs[0].ok) { failure("Search outside jobs", rs[0].error); return; }
+      if (!extState.loc && rs[1].ok && rs[1].data.location) extState.loc = rs[1].data.location;   // fills the box only; it is not scored
+      drawSearch(rs[0].data.configured, rs[1].ok ? rs[1].data : {});
+    });
+  }
+
+  function extCard(j, i, me) {
+    var tooShort = (j.description || "").length < 200;
+    return '<article class="card ext-card" data-i="' + i + '"><div class="stack-2"><h3 style="margin:0">' + esc(j.title) + '</h3><div class="job-meta">' +
+      [j.company, j.location, j.remote ? "remote" : "", j.employment_type, j.source ? "via " + j.source : "", j.posted_at ? "posted " + ago(j.posted_at) : ""].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div></div>" +
+      (me.skills && me.skills.length ? '<div class="chips-row"><small class="faint">Your skills in this post</small> ' + (j.skills_in_posting.length ? chips(j.skills_in_posting, 12, "chip-cyan") : '<span class="faint">none found</span>') + "</div>" : "") +
+      (j.description ? '<details><summary class="card-sub" style="cursor:pointer">Read the description</summary><div class="ext-desc">' + esc(j.description) + "</div></details>" : "") +
+      '<div class="ext-actions">' + (j.apply_url ? '<a class="btn btn-outline" href="' + esc(j.apply_url) + '" target="_blank" rel="noopener noreferrer">Open the posting</a>' : "") +
+      '<button type="button" class="btn btn-grad" data-act="fit"' + (tooShort || !me.has_profile ? " disabled" : "") + '>Check my fit</button>' +
+      '<button type="button" class="btn btn-outline" data-act="tailor"' + (tooShort || !me.has_resume ? " disabled" : "") + ">Tailor my resume</button></div>" +
+      (tooShort ? '<small class="faint">This post is too short to check. Open it and paste the full text in Jobs &amp; match.</small>' : "") + '<div class="card-stack" data-out aria-live="polite"></div></article>';
+  }
+
+  function drawSearch(configured, me) {
+    if (!configured) {
+      view.innerHTML = '<div class="view">' + header("Search outside jobs", LIVE) + notice("info", "The outside job feed is not switched on for this server yet. The person running Hiriq adds a JSearch key (RAPIDAPI_KEY) to turn it on. Until then, use Recommended and Jobs & match.") + "</div>";
+      return;
+    }
+    var res = extState.result;
+    var list = !res ? "" : res.jobs.length ? '<div class="job-list">' + res.jobs.map(function (j, i) { return extCard(j, i, me); }).join("") + "</div>"
+      : '<div class="card"><p class="empty-inline">Nothing found for that search. Try a broader title.</p></div>';
+    view.innerHTML = '<div class="view">' + header("Search outside jobs", LIVE) + '<div id="msg" aria-live="polite"></div>' +
+      '<form class="toolbar" id="s-form"><input class="field field-sm" id="s-q" placeholder="Job title or skill, e.g. data analyst" maxlength="100" value="' + esc(extState.q) + '" aria-label="Job title or skill" required minlength="2">' +
+      '<input class="field field-sm" id="s-loc" placeholder="City (optional)" maxlength="100" value="' + esc(extState.loc) + '" aria-label="City">' +
+      '<button type="submit" class="btn btn-grad" id="s-go">Search</button></form>' + list +
+      '<p class="privacy-note">These come from other job sites, so the text is theirs. There is no fit score until you press Check my fit, which reads the post with the AI and compares it to your resume.</p></div>';
+    $("#s-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      extState.q = $("#s-q").value.trim(); extState.loc = $("#s-loc").value.trim();
+      if (extState.q.length < 2) return;
+      $("#s-go").disabled = true;
+      $("#msg").innerHTML = notice("info", "Searching…");
+      api("GET", "/api/candidate/external?q=" + encodeURIComponent(extState.q) + (extState.loc ? "&location=" + encodeURIComponent(extState.loc) : "")).then(function (r) {
+        if (!r.ok) { $("#s-go").disabled = false; $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+        extState.result = r.data; drawSearch(true, me);
+      });
+    });
+    view.querySelectorAll(".ext-card").forEach(function (card) {
+      var job = res.jobs[Number(card.getAttribute("data-i"))], out = card.querySelector("[data-out]");
+      card.addEventListener("click", function (e) {
+        var act = e.target.getAttribute && e.target.getAttribute("data-act");
+        if (!act) return;
+        var btn = e.target; btn.disabled = true;
+        if (act === "fit") {
+          var fl = work(out, "fit", function () { btn.disabled = false; });
+          api("POST", "/api/candidate/match/paste", { text: job.description }).then(function (r) {
+            if (fl.cancelled) return;
+            btn.disabled = false;
+            if (!r.ok) { out.innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+            var d = r.data;
+            out.innerHTML = matchHtml({ score: d.score, parts: d.parts, explanation: d.explanation, summary: d.summary, assessed_weight: d.assessed_weight });
+          });
+        } else {
+          var tl2 = work(out, "tailor", function () { btn.disabled = false; });
+          api("POST", "/api/candidate/rewrite", { text: job.description }).then(function (r) {
+            if (tl2.cancelled) return;
+            if (!r.ok) { btn.disabled = false; out.innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+            window.location.hash = "#resume/" + r.data.id;
+          });
+        }
+      });
+    });
+  }
+
+
+  // =====================================================
+  // INTERVIEW PREP and COVER LETTERS (one job in, one saved document out)
+  // =====================================================
+  var DOC_PRESELECT = "";
+
+  function docIndex(cfg2) {
+    var mine = ++navId;
+    loading(cfg2.title);
+    Promise.all([api("GET", "/api/candidate/" + cfg2.list), api("GET", "/api/candidate/jobs")]).then(function (rs) {
+      if (mine !== navId) return;
+      if (!rs[0].ok) { failure(cfg2.title, rs[0].error); return; }
+      var D = rs[0].data, items = D[cfg2.key], jobs = rs[1].ok ? rs[1].data.jobs : [];
+      var opts = jobs.map(function (j) { return '<option value="' + esc(j.id) + '">' + esc(j.title + (j.company ? " · " + j.company : "")) + "</option>"; }).join("");
+      var list = items.length ? '<ul class="skill-rows">' + items.map(function (v) {
+        return '<li class="skill-row"><span class="skill-main"><strong><a href="#' + cfg2.route + "/" + esc(v.id) + '">' + esc(v.label || ("For " + (v.job_title || "a job"))) + "</a></strong><small class=\"faint\">" +
+          ago(v.created_at) + (v.questions != null ? " · " + v.questions + " questions" : "") + "</small></span></li>";
+      }).join("") + "</ul>" : '<p class="empty-inline">Nothing saved yet.</p>';
+      view.innerHTML = '<div class="view">' + header(cfg2.title, LIVE) + '<div id="msg" aria-live="polite">' + (D.has_resume ? "" : notice("info", "Upload your resume on My profile first. " + cfg2.title + " is built from what you have already written.")) + "</div>" +
+        '<div class="card card-stack"><h2 class="card-title">' + cfg2.make + "</h2><p class=\"privacy-note\">" + cfg2.note + "</p>" +
+        '<div class="field-group"><label class="label" for="d-job">An open job on Hiriq</label><select class="field field-sm" id="d-job"><option value="">Choose a job</option>' + opts + "</select></div>" +
+        '<div class="field-group"><label class="label" for="d-text">…or paste a job description</label><textarea class="field paste-box" id="d-text" maxlength="12000" placeholder="Paste the whole post"></textarea></div>' +
+        (cfg2.tones ? '<div class="field-group"><label class="label" for="d-tone">Tone</label><select class="field field-sm" id="d-tone" style="max-width:200px"><option value="professional">Professional</option><option value="friendly">Friendly</option></select></div>' : "") +
+        '<div class="actions-bar"><button type="button" class="btn btn-grad" id="d-go"' + (D.has_resume ? "" : " disabled") + ">" + cfg2.button + "</button></div></div>" +
+        '<div class="card card-stack"><div class="row-between"><h2 class="card-title">Saved</h2><span class="faint" style="font-size:13px">' + items.length + " of " + D.max + "</span></div>" + list + "</div></div>";
+      if (DOC_PRESELECT) { $("#d-job").value = DOC_PRESELECT; DOC_PRESELECT = ""; }
+      $("#d-go").addEventListener("click", function () {
+        var jobId = $("#d-job").value, text = $("#d-text").value.trim();
+        var body = jobId && !text ? { job_id: jobId } : !jobId && text ? { text: text } : null;
+        if (!body) { $("#msg").innerHTML = notice("error", "Choose an open job, or paste a job description, not both."); return; }
+        if (cfg2.tones) body.tone = $("#d-tone").value;
+        var btn = this; btn.disabled = true;
+        var loader = work($("#msg"), cfg2.kind, function () { btn.disabled = false; });
+        api("POST", "/api/candidate/" + cfg2.make_path, body).then(function (r) {
+          if (loader.cancelled) return;
+          if (!r.ok) { btn.disabled = false; $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+          window.location.hash = "#" + cfg2.route + "/" + r.data.id;
+        });
+      });
+    });
+  }
+
+  function docDelete(path, back, msgSel) {
+    if (!window.confirm("Delete this? Your resume stays.")) return;
+    api("DELETE", path).then(function (r) { r.ok ? (window.location.hash = back) : ($(msgSel).innerHTML = notice("error", explain(r))); });
+  }
+
+  var KIND_LABEL = { technical: "Technical", behavioural: "Behavioural", role: "About the role", gap: "Skills the job wants that your resume does not show" };
+
+  function drawPrep(P) {
+    var c = P.content || {}, groups = ["technical", "behavioural", "role", "gap"];
+    var qHtml = groups.map(function (k) {
+      var qs = (c.questions || []).filter(function (q) { return q.kind === k; });
+      if (!qs.length) return "";
+      return '<div class="card card-stack"><h2 class="card-title">' + esc(KIND_LABEL[k]) + '</h2><ul class="q-list">' + qs.map(function (q) {
+        return '<li class="q-item"><strong>' + esc(q.question) + "</strong>" + (q.why ? "<small>" + esc(q.why) + "</small>" : "") +
+          (q.resume_line ? "<small>From your resume:</small><blockquote>" + esc(q.resume_line) + "</blockquote>" : "") + (q.tip ? "<span>" + esc(q.tip) + "</span>" : "") + "</li>";
+      }).join("") + "</ul></div>";
+    }).join("");
+    var gaps = (c.gaps || []).length ? '<div class="card card-stack"><h2 class="card-title">Be ready to be honest about these</h2><ul class="skill-rows">' + c.gaps.map(function (g) {
+      return '<li class="skill-row"><span class="skill-main"><strong>' + esc(g.skill) + '</strong><small class="faint">' + (g.importance === "required" ? "Required" : "Nice to have") + "</small>" +
+        "<span style=\"font-size:13.5px\">" + (g.related_to ? "Your resume shows a related skill, " + esc(g.related_to) + ". Say so, and explain what you would learn first." : "Your resume does not show this. Say so plainly, and describe the closest thing you have done.") + "</span></span></li>";
+    }).join("") + "</ul></div>" : "";
+    var stories = (c.stories || []).length ? '<div class="card card-stack"><h2 class="card-title">Stories to prepare</h2><ul class="q-list">' + c.stories.map(function (s) {
+      return '<li class="q-item"><strong>' + esc(s.point) + "</strong><blockquote>" + esc(s.resume_line) + "</blockquote></li>";
+    }).join("") + "</ul></div>" : "";
+    var ask = (c.ask_them || []).length ? '<div class="card card-stack"><h2 class="card-title">Questions to ask them</h2><ul style="margin:0;padding-left:18px;display:grid;gap:6px">' +
+      c.ask_them.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul></div>" : "";
+    view.innerHTML = '<div class="view">' + header("Prep for " + (P.job_title || "a job"), LIVE) + '<p style="margin:0"><a class="btn-link" href="#prep">Back to interview prep</a></p><div id="msg" aria-live="polite"></div>' +
+      '<p class="privacy-note">These are likely questions, not a promise of what you will be asked. Every resume line shown here is really in your resume' + (c.dropped ? "; " + c.dropped + " suggestion" + (c.dropped === 1 ? " was" : "s were") + " removed because they did not stick to it" : "") + ".</p>" +
+      qHtml + gaps + stories + ask + '<p><button type="button" class="btn-link" id="p-del">Delete this prep</button></p></div>';
+    $("#p-del").addEventListener("click", function () { docDelete("/api/candidate/preps/" + encodeURIComponent(P.id), "#prep", "#msg"); });
+  }
+
+  function drawLetter(L) {
+    var dropped = ((L.content || {}).dropped || []);
+    view.innerHTML = '<div class="view">' + header(L.label, LIVE) + '<p style="margin:0"><a class="btn-link" href="#letters">Back to cover letters</a></p><div id="msg" aria-live="polite"></div>' +
+      '<p class="privacy-note">Written only from your resume' + (dropped.length ? "; " + dropped.length + " paragraph" + (dropped.length === 1 ? " was" : "s were") + " removed because they did not stick to it" : "") +
+      ". Read it through and make it yours before you send it. Check the date and the greeting.</p>" +
+      '<div class="card card-stack"><textarea class="field letter-edit" id="l-text" maxlength="12000" aria-label="Cover letter text">' + esc(L.text) + "</textarea>" +
+      '<div class="actions-bar"><button type="button" class="btn btn-grad" id="l-save">Save edits</button><button type="button" class="btn btn-outline" id="l-pdf">Download PDF</button>' +
+      '<button type="button" class="btn btn-outline" id="l-copy">Copy</button></div></div>' +
+      '<div class="card card-stack"><div class="field-group"><label class="label" for="l-label">Name</label><input class="field field-sm" id="l-label" maxlength="120" value="' + esc(L.label) + '"></div>' +
+      '<div class="actions-bar"><button type="button" class="btn btn-outline" id="l-rename">Rename</button><button type="button" class="btn-link" id="l-del">Delete this letter</button></div></div></div>';
+    function patch(body, ok) {
+      api("PATCH", "/api/candidate/letters/" + encodeURIComponent(L.id), body).then(function (r) {
+        if (!r.ok) { $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+        L = r.data; $("#msg").innerHTML = notice("good", ok);
+      });
+    }
+    $("#l-save").addEventListener("click", function () { patch({ text: $("#l-text").value }, "Saved."); });
+    $("#l-rename").addEventListener("click", function () { patch({ label: $("#l-label").value }, "Renamed."); });
+    $("#l-copy").addEventListener("click", function () {
+      (navigator.clipboard ? navigator.clipboard.writeText($("#l-text").value) : Promise.reject()).then(function () { $("#msg").innerHTML = notice("good", "Copied."); },
+        function () { $("#l-text").select(); $("#msg").innerHTML = notice("info", "Select all and copy with Ctrl+C."); });
+    });
+    $("#l-pdf").addEventListener("click", function () {
+      var btn = this, s2 = window.HiriqAuth.current();
+      if (!s2) { window.HiriqAuth.logout(); return; }
+      btn.disabled = true;
+      // Save what is on screen first, so the PDF has your latest edits.
+      api("PATCH", "/api/candidate/letters/" + encodeURIComponent(L.id), { text: $("#l-text").value }).then(function (pr) {
+        if (!pr.ok) { btn.disabled = false; $("#msg").innerHTML = notice("error", explain(pr)); return; }
+        L = pr.data;
+        return fetch(cfg.apiBase + "/api/candidate/letters/" + encodeURIComponent(L.id) + "/pdf", { headers: { Authorization: "Bearer " + s2.token } }).then(function (res) {
+          if (!res.ok) throw new Error("pdf");
+          return res.blob();
+        }).then(function (blob) {
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = (L.label || "cover-letter").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") + ".pdf";
+          document.body.appendChild(a); a.click(); a.remove();
+          btn.disabled = false;
+        });
+      }).catch(function () { btn.disabled = false; $("#msg").innerHTML = notice("error", "Could not make the PDF. Try again."); });
+    });
+    $("#l-del").addEventListener("click", function () { docDelete("/api/candidate/letters/" + encodeURIComponent(L.id), "#letters", "#msg"); });
+  }
+
+  function docDetail(title, path, draw) {
+    var mine = ++navId;
+    loading(title);
+    api("GET", path).then(function (r) {
+      if (mine !== navId) return;
+      if (!r.ok) { failure(title, r.status === 404 ? "That does not exist." : r.error); return; }
+      draw(r.data);
+    });
+  }
+
   // =====================================================
   // Router
   // =====================================================
+  var helpers = {
+    view: view, esc: esc, api: api, ago: ago, chips: chips, header: header, loading: loading, failure: failure, notice: notice, explain: explain,
+    LIVE: LIVE, jobMeta: jobMeta, nav: function () { return ++navId; }, current: function (id) { return id === navId; }
+  };
+  var apply = window.HiriqCandidateApply ? window.HiriqCandidateApply(helpers) : null;
+
   var VIEWS = {
     profile: [function () { renderProfile(); }, "My profile"],
     insights: [function () { renderInsights(); }, "Insights"],
-    jobs: [function (rest) { rest[0] ? renderJob(decodeURIComponent(rest[0])) : renderJobs(); }, "Jobs & match"]
+    recommended: [function () { renderRecommended(); }, "Recommended"],
+    search: [function () { renderSearch(); }, "Search outside jobs"],
+    prep: [function (rest) {
+      rest[0] ? docDetail("Interview prep", "/api/candidate/preps/" + encodeURIComponent(decodeURIComponent(rest[0])), drawPrep)
+        : docIndex({ kind: "prep", title: "Interview prep", list: "preps", key: "preps", route: "prep", make: "Prepare for a job", make_path: "prep", button: "Prepare me",
+                     note: "Likely questions for the job, tied to lines you already wrote, plus honest notes on the skills your resume does not show." });
+    }, "Interview prep"],
+    letters: [function (rest) {
+      rest[0] ? docDetail("Cover letter", "/api/candidate/letters/" + encodeURIComponent(decodeURIComponent(rest[0])), drawLetter)
+        : docIndex({ kind: "letter", title: "Cover letters", list: "letters", key: "letters", route: "letters", make: "Write a cover letter", make_path: "letters", button: "Write my letter", tones: true,
+                     note: "Written only from your resume. Anything that adds a number or a skill your resume does not have is thrown away, and your name and contact details are filled in for you." });
+    }, "Cover letters"],
+    resume: [function (rest) { rest[0] ? renderVersion(decodeURIComponent(rest[0])) : renderResume(); }, "Tailor resume"],
+    jobs: [function (rest) { rest[0] ? renderJob(decodeURIComponent(rest[0])) : renderJobs(); }, "Jobs & match"],
+    applications: [function () { apply ? apply.applications() : failure("Applications", "This part did not load. Refresh the page."); }, "Applications"]
   };
   function route() {
     var parts = (location.hash || "#profile").slice(1).split("/");

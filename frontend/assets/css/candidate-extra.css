@@ -1,0 +1,34 @@
+/* Hiriq — candidate workspace additions: documents, find-work screens and the sidebar group labels. Loaded after candidate.css. */
+/* Sidebar group labels */
+.side-nav .nav-label { margin: 14px 0 2px; padding: 0 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--ink) / 0.45); }
+
+/* Documents: tailored resume, interview prep, cover letters */
+.doc-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.doc-row h3 { margin: 0; font-size: 16px; }
+.or-line { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: rgb(var(--ink) / 0.55); }
+.or-line::before, .or-line::after { content: ""; flex: 1; height: 1px; background: rgb(255 255 255 / 0.1); }
+.inline-form { display: flex; flex-wrap: wrap; gap: 10px; }
+.inline-form .field { flex: 1; min-width: 200px; max-width: 420px; }
+.doc-text { min-height: 360px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; }
+.plain-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.rewrite { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; padding: 12px; border-radius: 14px; background: rgb(255 255 255 / 0.04); border: 1px solid rgb(255 255 255 / 0.07); }
+.rewrite small { display: block; margin-bottom: 4px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgb(var(--ink) / 0.5); }
+.rewrite .rw-old { color: rgb(var(--ink) / 0.7); }
+.rewrite .rw-new { padding-left: 10px; border-left: 2px solid rgb(var(--a4) / 0.7); }
+.rewrite > small.faint { grid-column: 1 / -1; margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; }
+@media (max-width: 720px) { .rewrite { grid-template-columns: 1fr; } }
+.qa { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / 0.04); border: 1px solid rgb(255 255 255 / 0.07); font-size: 14px; }
+.qa p { margin: 0; line-height: 1.55; }
+.qa blockquote { margin: 0; padding-left: 10px; border-left: 2px solid rgb(var(--a1) / 0.5); font-size: 13px; color: rgb(var(--ink) / 0.7); overflow-wrap: anywhere; }
+.qa blockquote small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: rgb(var(--ink) / 0.45); }
+.fit-out { display: flex; flex-direction: column; gap: 12px; }
+.fit-out:empty { display: none; }
+@media (max-width: 900px) { .side-nav .nav-label { display: none; } }
+
+/* Outside jobs: the estimated match beside each post */
+.match-pill { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 12px; border-radius: 12px; font-weight: 600; font-size: 15px; white-space: nowrap; border: 1px solid rgb(var(--a2) / .4); background: rgb(var(--a2) / .12); }
+.match-pill small { font-size: 10px; font-weight: 500; opacity: .7; letter-spacing: .03em; text-transform: uppercase; }
+.match-pill.match-high { border-color: rgb(var(--a4) / .5); background: rgb(var(--a4) / .14); color: rgb(var(--a4)); }
+.match-pill.match-mid { border-color: rgb(var(--warn) / .5); background: rgb(var(--warn) / .12); color: rgb(var(--warn)); }
+.match-pill.match-low { border-color: rgb(var(--bad) / .4); background: rgb(var(--bad) / .1); color: rgb(var(--bad)); }
+.match-pill.match-none { font-size: 12px; font-weight: 500; opacity: .75; background: transparent; border-style: dashed; }

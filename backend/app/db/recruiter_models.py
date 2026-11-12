@@ -222,6 +222,36 @@ class Application(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class ExternalJob(Base):
+    """A job post fetched from an outside feed (Indeed through the Jobs API), kept so Hiriq builds its own library of the market.
+    Public job text only: nothing about any candidate is stored here, and no score either (scores are worked out per candidate
+    when asked). One row per post: fetching the same post again only refreshes the text and `last_seen_at`.
+    `read` is what the rules reader found in the text (skills, years, degree), so market questions need no re-reading."""
+
+    __tablename__ = "external_jobs"
+    __table_args__ = (
+        UniqueConstraint("provider", "external_id", name="uq_external_job_provider_id"),
+        Index("ix_external_jobs_last_seen", "last_seen_at"),
+        Index("ix_external_jobs_title", "title"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(30), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    company: Mapped[str | None] = mapped_column(String(160))
+    location: Mapped[str | None] = mapped_column(String(160))
+    country: Mapped[str | None] = mapped_column(String(2))
+    remote: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    apply_url: Mapped[str | None] = mapped_column(String(600))
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    read: Mapped[dict] = mapped_column(Json, nullable=False, default=dict)
+    last_query: Mapped[str | None] = mapped_column(String(100))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class PipelineEntry(Base):
     """Where a candidate stands for a job. `reached` is the furthest stage index, so the funnel survives a rejection."""
 

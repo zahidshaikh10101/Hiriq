@@ -8,6 +8,7 @@ from test_candidate import ME, make_job, make_user, profile_body, ready
 
 RELOAD = ["app.core.config", "app.db.session", "app.db.init_db", "app.db.upgrade", "app.core.deps", "app.services.llm",
           "app.services.resume_text", "app.services.resume", "app.services.matching", "app.services.jobread", "app.services.externaljobs",
+          "app.services.postingread", "app.services.externalstore",
           "app.routers.candidates", "app.routers.matches", "app.routers.candidate", "app.routers.candidate_discover"]
 
 
@@ -214,3 +215,81 @@ def test_a_bad_radius_is_refused(env, monkeypatch):
     feed(env, monkeypatch)
     assert env.client.get(f"{ME}/external", headers=h, params={"q": "data", "radius": 1}).status_code == 422
     assert env.client.get(f"{ME}/external", headers=h, params={"q": "data", "radius": 500}).status_code == 422
+
+
+# ---------------------------------------------------------------- estimated match, best first, and the saved library
+def three(env, monkeypatch):
+    feed(env, monkeypatch, indeed(item(1, "Platform Engineer", "Docker, Kubernetes and Terraform are required."), item(2, "Analyst", "SQL and Python are required."),
+                                  item(3, "Vague", "We are a friendly team that values people.")))
+
+
+def search(env, h, **p):
+    return env.client.get(f"{ME}/external", headers=h, params={"q": "data", **p})
+
+
+def test_each_outside_job_gets_an_estimated_match_and_the_best_comes_first(env, monkeypatch):
+    _, h = ready(env)                                                    # skills: SQL, Python
+    three(env, monkeypatch)
+    body = search(env, h).json()
+    assert body["can_score"] is True and [j["title"] for j in body["jobs"]] == ["Analyst", "Platform Engineer", "Vague"]
+    a, p, v = (j["match"] for j in body["jobs"])
+    assert a["estimated"] is True and a["matched"] == ["sql", "python"] and a["missing"] == [] and a["required_total"] == 2 and a["required_met"] == 2
+    assert p["missing"] == ["docker", "kubernetes", "terraform"] and a["score"] > p["score"] >= 0
+    assert v is None                                                     # no skill we know in the post: no number rather than a made-up one
+    assert all(j["job_ref"] for j in body["jobs"])
+
+
+def test_without_a_profile_the_jobs_show_but_carry_no_percentage(env, monkeypatch):
+    _, empty = make_user(env, "empty@example.com")
+    three(env, monkeypatch)
+    body = search(env, empty).json()
+    assert body["can_score"] is False and len(body["jobs"]) == 3 and all(j["match"] is None for j in body["jobs"])
+
+
+def test_every_fetched_job_is_kept_once(env, monkeypatch):
+    from sqlalchemy import select
+    from app.db.recruiter_models import ExternalJob
+
+    _, h = ready(env)
+    three(env, monkeypatch)
+    assert search(env, h).status_code == 200
+    with env.session.SessionLocal() as db:
+        first = {r.external_id: r for r in db.scalars(select(ExternalJob)).all()}
+        stamp = first["id-2"].first_seen_at
+    assert sorted(first) == ["id-1", "id-2", "id-3"] and first["id-2"].title == "Analyst" and first["id-2"].last_query == "data"
+    assert first["id-2"].read["skills_required"] == ["sql", "python"] and first["id-2"].country == "in" and first["id-2"].provider == "indeed"
+    feed(env, monkeypatch, indeed(item(2, "Analyst II", "SQL and Python are required."), item(4, "Fresh", "Docker is required.")))
+    assert search(env, h, q="fresh").status_code == 200
+    with env.session.SessionLocal() as db:
+        rows = {r.external_id: r for r in db.scalars(select(ExternalJob)).all()}
+    assert sorted(rows) == ["id-1", "id-2", "id-3", "id-4"]              # the same post is refreshed, never duplicated
+    assert rows["id-2"].title == "Analyst II" and rows["id-2"].first_seen_at == stamp and rows["id-2"].last_query == "fresh"
+
+
+def test_detailed_analysis_explains_the_estimate(env, monkeypatch):
+    _, h = ready(env)
+    three(env, monkeypatch)
+    jobs_ = {j["title"]: j for j in search(env, h).json()["jobs"]}
+    r = env.client.get(f"{ME}/external/jobs/{jobs_['Analyst']['job_ref']}/fit", headers=h)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["estimated"] is True and d["score"] == jobs_["Analyst"]["match"]["score"] and d["job"]["title"] == "Analyst"
+    assert [x["skill"] for x in d["explanation"]["skills"]["required"]] == ["sql", "python"] and set(d["parts"]) >= {"skills", "keywords"}
+    assert d["read"]["skills_required"] == ["sql", "python"] and "by rules" in d["basis"] and "description" not in d["job"]
+    miss = env.client.get(f"{ME}/external/jobs/{jobs_['Platform Engineer']['job_ref']}/fit", headers=h).json()
+    assert miss["missing_required"] == ["docker", "kubernetes", "terraform"]
+
+
+def test_detailed_analysis_edge_cases(env, monkeypatch):
+    _, h = ready(env)
+    three(env, monkeypatch)
+    jobs_ = {j["title"]: j for j in search(env, h).json()["jobs"]}
+    fit = lambda ref, hh=h: env.client.get(f"{ME}/external/jobs/{ref}/fit", headers=hh)
+    r = fit(jobs_["Vague"]["job_ref"])
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "no_skills_found"
+    assert fit("00000000-0000-0000-0000-000000000000").status_code == 404 and fit("not-a-uuid").status_code == 404
+    _, empty = make_user(env, "empty2@example.com")
+    assert fit(jobs_["Analyst"]["job_ref"], empty).status_code == 409
+    _, rect = make_user(env, "r2@example.com", role="recruiter")
+    assert fit(jobs_["Analyst"]["job_ref"], rect).status_code == 403
+    assert env.client.get(f"{ME}/external/jobs/{jobs_['Analyst']['job_ref']}/fit").status_code == 401

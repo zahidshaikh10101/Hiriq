@@ -39,6 +39,11 @@ def configured() -> bool:
     return bool(os.getenv("RAPIDAPI_KEY", "").strip())
 
 
+def country() -> str:
+    """The two-letter country searches use (EXTERNAL_COUNTRY, default in)."""
+    return (os.getenv("EXTERNAL_COUNTRY", "in").strip().lower() or "in")[:2]
+
+
 def _cap() -> int:
     try:
         return int(os.getenv("EXTERNAL_DAILY_CAP", "100"))
@@ -113,13 +118,13 @@ def search(query: str, location: str = "", page: int = 1, radius_km: int = 20) -
     """Raises ExternalError. Returns {"jobs": [...normalised, at most 20], "has_more": bool}."""
     if not configured():
         raise ExternalError("not_configured", "The outside job feed is not set up on this server.", 503)
-    country = (os.getenv("EXTERNAL_COUNTRY", "in").strip().lower() or "in")[:2]
-    base = (query.lower(), location.lower(), radius_km, country)
+    cc = country()
+    base = (query.lower(), location.lower(), radius_km, cc)
     key = base + (page,)
     hit = _cache.get(key)
     if hit and time.time() - hit[0] < CACHE_SECONDS:
         return hit[1]
-    params = {"query": query, "radius": str(radius_km), "radiusType": "km", "sortType": "relevance", "countryCode": country}
+    params = {"query": query, "radius": str(radius_km), "radiusType": "km", "sortType": "relevance", "countryCode": cc}
     if location:
         params["location"] = location
     if page > 1:                                  # later pages are fetched with the token the page before gave us

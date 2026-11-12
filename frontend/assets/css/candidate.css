@@ -66,3 +66,30 @@
 .employer { padding: 9px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.04); font-size: 14px; }
 .employer small { color: rgb(var(--ink) / 0.55); }
 .privacy-note { font-size: 12.5px; color: rgb(var(--ink) / 0.6); margin: 0; }
+
+/* ---------- tailor resume ---------- */
+.rewrite-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.rewrite { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid rgb(var(--ink) / 0.1); border-radius: 12px; }
+.rewrite .was { color: rgb(var(--ink) / 0.55); text-decoration: line-through; font-size: 13.5px; overflow-wrap: anywhere; }
+.rewrite .now { font-size: 14.5px; overflow-wrap: anywhere; }
+.rewrite small { color: rgb(var(--ink) / 0.6); }
+.score-pair { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.score-pair .mono { font-size: 22px; }
+.resume-edit { width: 100%; min-height: 360px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.55; resize: vertical; }
+
+/* ---------- recommended and outside search ---------- */
+.rec-why { margin: 0; font-size: 13.5px; color: rgb(var(--ink) / 0.75); }
+.ext-card { display: grid; gap: 10px; }
+.ext-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ext-desc { font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: rgb(var(--ink) / 0.75); max-height: 220px; overflow: auto; }
+
+/* ---------- interview prep and cover letters ---------- */
+.q-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.q-item { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid rgb(var(--ink) / 0.1); border-radius: 12px; }
+.q-item strong { font-size: 15px; overflow-wrap: anywhere; }
+.q-item blockquote { margin: 0; padding-left: 10px; border-left: 2px solid rgb(var(--a1) / 0.5); font-size: 12.5px; color: rgb(var(--ink) / 0.65); overflow-wrap: anywhere; }
+.q-item small { color: rgb(var(--ink) / 0.6); }
+.letter-edit { width: 100%; min-height: 460px; font-size: 14px; line-height: 1.6; resize: vertical; }
+
+.jdl-check, .jdl-check.ok { cursor: pointer; }
+.jdl-check.ok { border-color: rgb(var(--a4) / 0.35); }

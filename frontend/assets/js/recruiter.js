@@ -1,5 +1,5 @@
 /* Hiriq — recruiter workspace. Live data from the backend (/api/recruiter/*).
-   Views are chosen by the URL hash: #overview #jobs #jobs/new #jobs/<id> #candidates #matching #pipeline #pipeline/<job id> #ask.
+   Views are chosen by the URL hash: #overview #jobs #jobs/new #jobs/<id> #candidates #matching #pipeline #pipeline/<job id> #applicants #applicants/<job id> #applicants/<job id>/<application id> #ask.
    Overview (phase 1), Jobs & JDs (2), Candidates (3), Matching (4), Pipeline (5) and Ask the pool (6) are live. */
 (function () {
   var view = document.getElementById("view");
@@ -58,6 +58,7 @@
   var matching = window.HiriqMatching ? window.HiriqMatching(helpers) : null;
   var pipeline = window.HiriqPipeline ? window.HiriqPipeline(helpers) : null;
   var ask = window.HiriqAsk ? window.HiriqAsk(helpers) : null;
+  var applicants = window.HiriqApplicants ? window.HiriqApplicants(helpers) : null;
 
   // =====================================================
   // OVERVIEW
@@ -238,6 +239,7 @@
     candidates: [function (rest) { return !candidates ? renderSoon("Candidates", "Unavailable", "The candidates module did not load. Refresh the page.", []) : rest[0] ? candidates.detail(rest[0]) : candidates.list(); }, "Candidates"],
     matching: [function (rest) { return !matching ? renderSoon("Matching", "Unavailable", "The matching module did not load. Refresh the page.", []) : matching.show(rest[0] ? decodeURIComponent(rest[0]) : ""); }, "Matching"],
     pipeline: [function (rest) { return !pipeline ? renderSoon("Pipeline", "Unavailable", "The pipeline module did not load. Refresh the page.", []) : pipeline.show(rest[0] ? decodeURIComponent(rest[0]) : ""); }, "Pipeline"],
+    applicants: [function (rest) { return !applicants ? renderSoon("Applicants", "Unavailable", "The applicants module did not load. Refresh the page.", []) : applicants.show(rest[0] ? decodeURIComponent(rest[0]) : "", rest[1] ? decodeURIComponent(rest[1]) : ""); }, "Applicants"],
     ask: [function () { return !ask ? renderSoon("Ask the pool", "Unavailable", "The ask module did not load. Refresh the page.", []) : ask.show(); }, "Ask the pool"]
   };
   function route() {

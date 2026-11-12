@@ -3,8 +3,8 @@
 Resume-to-job matching that explains itself: matched skills, gaps, and the next fix.
 Three workspaces (candidate, recruiter, admin) on one matching engine.
 
-> Stage: **recruiter workspace and admin console are built and run on real data.** The candidate workspace, job
-> ingestion with morning alerts, and the trained ranker are still to come (see the roadmap).
+> Stage: **recruiter workspace, candidate workspace and admin console are built and run on real data.** Job
+> ingestion with morning alerts and the trained ranker are still to come (see the roadmap).
 
 ## What works today
 
@@ -17,6 +17,11 @@ Three workspaces (candidate, recruiter, admin) on one matching engine.
 | Recruiter: Matching | Rank the pool against a job. Five weighted parts (skills 40, qualification 20, experience 30, location 5, keywords 5 by default, adjustable per run), each explained. Optional AI second look at skill gaps. |
 | Recruiter: Pipeline | Stage board per job (sourced to hired, plus a rejected lane), notes, thumbs up/down on a match. |
 | Recruiter: Ask the pool | Ask a question in plain English, get an answer quoted from the resumes. Questions that filter by gender, age, religion, caste, nationality, marital status or disability are refused. |
+| Candidate: Profile and Insights | Upload a resume, correct what the reader got wrong, choose whether recruiters can find you, see your skills with evidence and the skills open jobs ask for. |
+| Candidate: Finding work | *For you* ranks open jobs by your fit with the reasons; *Jobs & match* scores any job or a pasted description; *Outside jobs* searches other sites (needs a JSearch key). |
+| Candidate: Get ready | *Tailor resume* rewords your own lines for a job, *Cover letters* (with PDF) and *Interview prep* are built only from your resume; anything your resume cannot back is dropped. |
+| Candidate: Apply | Send a copy of your resume (or a tailored version), a letter and a message to the job's recruiter, and withdraw any time. |
+| Recruiter: Applicants | See who applied to each job, their fit, contact details, the resume and letter they sent; add them to the pipeline with one click. |
 | Admin | Overview, Users and roles, AI usage (attempts, success rate, speed, tokens, by feature and model), Audit log. |
 
 ## Repository layout
@@ -25,7 +30,8 @@ Three workspaces (candidate, recruiter, admin) on one matching engine.
 hiriq/
 ├── frontend/            Plain HTML, CSS and JavaScript. No build step, no Node.js.
 │   ├── index.html, login.html, signup.html, forgot-password.html, complete-profile.html
-│   ├── recruiter.html   Recruiter workspace (Overview, Jobs, Candidates, Matching, Pipeline, Ask)
+│   ├── recruiter.html   Recruiter workspace (Overview, Jobs, Candidates, Matching, Applicants, Pipeline, Ask)
+│   ├── candidate.html   Candidate workspace (Profile, Insights, For you, Jobs, Outside jobs, Applications, Tailor resume, Cover letters, Interview prep)
 │   ├── admin.html       Admin console (Overview, Users, AI usage, Jobs, Model quality, Audit log)
 │   └── assets/
 │       ├── css/         base.css (tokens, fonts), components.css, one file per page or workspace
@@ -81,7 +87,7 @@ Push this repo to GitHub, open it in a Codespace and run the steps above there.
 | Accounts | Database, Google and email-code sign-up, admin console on real data | done |
 | Recruiter workspace | Overview, jobs and JD writer, candidates and resume reader, matching, pipeline, ask the pool | done |
 | Admin AI usage | Cost and reliability of the free models, by feature and model | done |
-| Candidate workspace | Upload a resume, score it against a job, skill gaps, relevant jobs | next |
+| Candidate workspace | Upload a resume, score it against a job, skill gaps, relevant jobs, tailored resume, letters, interview prep, apply | done |
 | Job ingestion and alerts | Postings from sources, de-duplication, morning alerts | planned |
 | Evaluation set | 100-150 labelled resume-job pairs and an NDCG@5 table (see `ml/README.md`) | planned |
 | Trained ranker | Learn from recruiter thumbs and the labelled set | planned |

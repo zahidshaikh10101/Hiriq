@@ -329,6 +329,30 @@ CREATE INDEX ix_applications_job_created ON applications (job_id, created_at);
 
 CREATE INDEX ix_applications_candidate_created ON applications (candidate_id, created_at);
 
+CREATE TABLE external_jobs (
+	id UUID NOT NULL, 
+	provider VARCHAR(30) NOT NULL, 
+	external_id VARCHAR(200) NOT NULL, 
+	title VARCHAR(160) NOT NULL, 
+	company VARCHAR(160), 
+	location VARCHAR(160), 
+	country VARCHAR(2), 
+	remote BOOLEAN NOT NULL, 
+	apply_url VARCHAR(600), 
+	description TEXT NOT NULL, 
+	posted_at TIMESTAMP WITH TIME ZONE, 
+	read JSONB NOT NULL, 
+	last_query VARCHAR(100), 
+	first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_external_job_provider_id UNIQUE (provider, external_id)
+);
+
+CREATE INDEX ix_external_jobs_last_seen ON external_jobs (last_seen_at);
+
+CREATE INDEX ix_external_jobs_title ON external_jobs (title);
+
 CREATE TABLE pipeline_entries (
 	id UUID NOT NULL, 
 	job_id UUID NOT NULL, 

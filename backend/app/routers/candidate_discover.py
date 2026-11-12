@@ -2,15 +2,19 @@
 
     GET /recommendations    open Hiriq jobs ranked by how well you fit, with why and what is missing (rules only, instant)
     GET /external/status    is the outside job feed switched on?
-    GET /external           search jobs outside Hiriq, from Indeed (?q=&location=&radius=&page=): each with which of YOUR skills the posting mentions
+    GET /external           search jobs outside Hiriq, from Indeed (?q=&location=&radius=&page=): best estimated match first
+    GET /external/jobs/{job_ref}/fit    the full, explained score of one outside job for you (rules only, instant)
 
-An outside job has no skill list, so it gets no 0-100 score here. To score one, send its description to POST /match/paste
-(or /rewrite) from the screen. Your location is never scored; it only fills the search box.
+An outside job has no skill list, so its percentage is an ESTIMATE: postingread.py finds the skills, years and degree the post
+mentions and the same engine as a Hiriq job scores them against you. The screen labels it "estimated". For the careful
+version, send the description to POST /match/paste (AI read). Every post fetched is kept in external_jobs (public text only).
+Your location is never scored; it only fills the search box.
 """
 from __future__ import annotations
 
 import re
 import time
+import uuid
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Query
@@ -20,11 +24,11 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_candidate
 from app.db.models import User
-from app.db.recruiter_models import CandidateJobMatch
+from app.db.recruiter_models import CandidateJobMatch, ExternalJob
 from app.db.session import get_db
-from app.routers.candidate import _db, _ensure, _err, _fit, _has_skills, _matchable, _open_jobs, _public_job, _score_and_store
-from app.routers.matches import _cand_sig
-from app.services import externaljobs, resume
+from app.routers.candidate import CANDIDATE_WEIGHTS, _db, _ensure, _err, _fit, _has_skills, _matchable, _open_jobs, _public_job, _score_and_store
+from app.routers.matches import _cand_sig, _cand_view
+from app.services import externaljobs, externalstore, matching, postingread, resume
 
 router = APIRouter(tags=["candidate-discover"])
 
@@ -84,7 +88,28 @@ def external_status(actor: User = Depends(require_candidate)) -> dict:
     return {"configured": externaljobs.configured()}
 
 
-def _external(c, user_id: str, q: str, location: str, page: int, radius: int) -> dict:
+def _estimate(c, row: ExternalJob | None) -> dict | None:
+    """The estimated match of one saved outside job, or None when the post names no skill we know (then nothing honest can be said)."""
+    if row is None:
+        return None
+    read = row.read or {}
+    if not read.get("skills_required") and not read.get("skills_nice"):
+        return None
+    result = matching.score_candidate(postingread.view(row.title, row.description, row.location, read), _cand_view(c), CANDIDATE_WEIGHTS, None)
+    return result
+
+
+def _brief(result: dict) -> dict:
+    e, b = result["explanation"], result["breakdown"]
+    req, nice = e["skills"]["required"], e["skills"]["nice"]
+    everything = req + nice
+    return {"score": int(round(result["score"])), "assessed_weight": b.get("assessed_weight"), "estimated": True,
+            "required_total": len(req), "required_met": sum(1 for r in req if r["credit"] >= 1),
+            "matched": [r["skill"] for r in everything if r["credit"] >= 1][:8],
+            "missing": [r["skill"] for r in req if r["credit"] == 0][:5]}
+
+
+def _external(c, user_id: str, q: str, location: str, page: int, radius: int, db: Session) -> dict:
     stamps = [t for t in _hits[user_id] if time.time() - t < 3600]
     if len(stamps) >= EXTERNAL_PER_HOUR:
         _hits[user_id] = stamps
@@ -96,12 +121,19 @@ def _external(c, user_id: str, q: str, location: str, page: int, radius: int) ->
     stamps.append(time.time())
     _hits[user_id] = stamps
     jobs = [dict(j) for j in found["jobs"]]                  # the cached copy stays untouched
+    saved = externalstore.save(db, jobs, q, externaljobs.country())
     mine = resume.clean_skills(list(c.skills or []))
+    can_score = _matchable(c)
     for j in jobs:
         low = j["description"].lower()
         j["skills_in_posting"] = [s for s in mine if resume._skill_pattern(s).search(low)][:12]
-    jobs.sort(key=lambda j: -len(j["skills_in_posting"]))
-    return {"configured": True, "q": q, "location": location, "page": page, "radius": radius, "has_more": found["has_more"], "your_skills": len(mine), "jobs": jobs}
+        row = saved.get(j["id"])
+        j["job_ref"] = str(row.id) if row else None
+        result = _estimate(c, row) if can_score else None
+        j["match"] = _brief(result) if result else None
+    jobs.sort(key=lambda j: (-(j["match"]["score"] if j["match"] else -1), -len(j["skills_in_posting"])))
+    return {"configured": True, "q": q, "location": location, "page": page, "radius": radius, "has_more": found["has_more"],
+            "your_skills": len(mine), "can_score": can_score, "jobs": jobs}
 
 
 @router.get("/external")
@@ -113,4 +145,31 @@ async def external_search(
     c = _ensure(db, actor)
     if not externaljobs.configured():
         raise _err(503, "not_configured", "The outside job feed is not set up on this server.")
-    return await run_in_threadpool(_external, c, str(actor.id), re.sub(r"\s+", " ", q).strip(), re.sub(r"\s+", " ", location).strip(), page, radius)
+    return await run_in_threadpool(_external, c, str(actor.id), re.sub(r"\s+", " ", q).strip(), re.sub(r"\s+", " ", location).strip(), page, radius, db)
+
+
+@router.get("/external/jobs/{job_ref}/fit")
+def external_fit(job_ref: str, actor: User = Depends(require_candidate), db: Session | None = Depends(get_db)) -> dict:
+    """The detailed, explained estimate for one saved outside job: every skill with its evidence, and each part of the score."""
+    db = _db(db)
+    c = _ensure(db, actor)
+    if not _matchable(c):
+        raise _err(409, "no_profile", "Add your resume or some skills first, then check a job.")
+    try:
+        row = db.get(ExternalJob, uuid.UUID(str(job_ref)))
+    except ValueError:
+        row = None
+    if row is None:
+        raise _err(404, "not_found", "That job is no longer saved. Search again to bring it back.")
+    result = _estimate(c, row)
+    if result is None:
+        raise _err(422, "no_skills_found", "This post names no skill Hiriq recognises, so it cannot be scored. Open it to read it yourself, or paste it into Jobs & match for an AI read.")
+    e, b = result["explanation"], result["breakdown"]
+    req = e["skills"]["required"]
+    return {
+        "job": {"job_ref": str(row.id), "title": row.title, "company": row.company, "location": row.location, "apply_url": row.apply_url},
+        "read": row.read, "estimated": True, "score": int(round(result["score"])), "assessed_weight": b.get("assessed_weight"),
+        "parts": b.get("parts"), "weights": b.get("weights"), "explanation": e, "required_total": len(req),
+        "required_met": sum(1 for r in req if r["credit"] >= 1), "missing_required": [r["skill"] for r in req if r["credit"] == 0],
+        "summary": e.get("summary"), "basis": "Estimated from the words of the post by rules, not read by AI. Open the post to check it.",
+    }
