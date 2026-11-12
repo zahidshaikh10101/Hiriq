@@ -5,7 +5,7 @@
 .auth {
   display: flex;
   flex-wrap: wrap;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--zoom, 1));
 }
 .auth-main {
   flex: 1 1 480px;

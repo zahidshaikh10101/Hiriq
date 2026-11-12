@@ -55,6 +55,10 @@
 }
 
 html {
+  /* Render the whole UI at 90% so 100% browser zoom looks like 80%.
+     Change --zoom in one place to rescale every page. */
+  --zoom: 0.9;
+  zoom: var(--zoom);
   background: rgb(var(--bg));
   scroll-behavior: smooth;
   scroll-padding-top: 110px;
@@ -62,7 +66,7 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--zoom, 1));
   background: rgb(var(--bg));
   color: rgb(var(--ink));
   font-family: var(--font-sans);

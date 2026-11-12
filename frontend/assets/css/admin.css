@@ -7,7 +7,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 16px;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--zoom, 1));
   padding: 16px;
 }
 
@@ -22,7 +22,7 @@
   border-radius: 26px;
   position: sticky;
   top: 16px;
-  height: calc(100vh - 32px);
+  height: calc(100vh / var(--zoom, 1) - 32px);
 }
 .sidebar-top {
   display: flex;

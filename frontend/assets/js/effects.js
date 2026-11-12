@@ -42,8 +42,10 @@
         function (e) {
           cancelAnimationFrame(frame);
           frame = requestAnimationFrame(function () {
-            light.style.setProperty("--mx", e.clientX + "px");
-            light.style.setProperty("--my", e.clientY + "px");
+            // the page is zoomed (see --zoom in base.css), so convert pointer px to CSS px
+            var z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zoom")) || 1;
+            light.style.setProperty("--mx", e.clientX / z + "px");
+            light.style.setProperty("--my", e.clientY / z + "px");
           });
         },
         { passive: true }
