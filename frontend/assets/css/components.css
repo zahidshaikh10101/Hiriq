@@ -415,3 +415,150 @@ select.field {
   height: 38px;
   width: auto;
 }
+
+/* ---------- Nav: solid, full width. Page content fades out as it scrolls under it. ---------- */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgb(var(--bg));
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.nav-bar.scrolled {
+  border-bottom-color: rgb(255 255 255 / 0.14);
+}
+/* The fade: a strip of the page colour under the bar, so text and images dissolve before they reach the edge */
+.nav-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 56px;
+  background: linear-gradient(rgb(var(--bg)), rgb(var(--bg) / 0));
+  pointer-events: none;
+}
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 68px;
+}
+.nav-links {
+  display: flex;
+  gap: 28px;
+}
+.nav-links a {
+  color: rgb(var(--ink) / 0.8);
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.nav-links a:hover {
+  color: rgb(var(--ink));
+}
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 860px) {
+  .nav-links {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .nav-actions .btn {
+    padding: 0 14px;
+  }
+}
+
+/* ---------- Footer (landing and legal pages) ---------- */
+.footer {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(var(--bg));
+}
+.footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 40px;
+  padding-top: 44px;
+  padding-bottom: 36px;
+}
+.footer-brand {
+  flex: 1 1 260px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.footer-brand p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgb(var(--ink) / 0.6);
+}
+.footer-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+}
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 140px;
+}
+.footer-col h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--ink) / 0.5);
+}
+.footer-col a {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgb(var(--ink) / 0.8);
+  transition: color 0.2s;
+}
+.footer-col a:hover {
+  color: rgb(var(--a1));
+}
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding-top: 20px;
+  padding-bottom: 28px;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  font-size: 14px;
+  color: rgb(var(--ink) / 0.6);
+}
+.made {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.heart {
+  width: 15px;
+  height: 15px;
+  fill: #ff3b5c;
+  filter: drop-shadow(0 0 6px rgb(255 59 92 / 0.6));
+  animation: heartbeat 1.8s ease-in-out infinite;
+}
+@keyframes heartbeat {
+  0%, 60%, 100% { transform: scale(1); }
+  15% { transform: scale(1.22); }
+  30% { transform: scale(1); }
+  42% { transform: scale(1.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heart { animation: none; }
+}
+
