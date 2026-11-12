@@ -327,3 +327,19 @@ class AiCall(Base):
     prompt_tokens: Mapped[int | None] = mapped_column(Integer)
     completion_tokens: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ExternalCall(Base):
+    """One request to the outside job feed (RapidAPI). Powers the RapidAPI panel in admin; no search text or results are stored."""
+
+    __tablename__ = "external_calls"
+    __table_args__ = (Index("ix_external_calls_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigId, primary_key=True, autoincrement=True)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    provider: Mapped[str] = mapped_column(String(30), nullable=False, server_default="indeed")
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    error: Mapped[str | None] = mapped_column(String(200))             # short reason when ok is false
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    results: Mapped[int | None] = mapped_column(Integer)               # posts returned
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -626,8 +626,12 @@ def test_admin_plan_rules_and_unknown_user(env):
     complete_signup(env)
     uid = user_row(env, email=EMAIL).id
     h = auth(token_for(env, "root"))
-    assert env.client.patch(f"/api/admin/users/{uid}", headers=h, json={"plan": "pro"}).json()["detail"]["code"] == "plan_unavailable"
+    assert env.client.patch(f"/api/admin/users/{uid}", headers=h, json={"plan": "gold"}).json()["detail"]["code"] == "plan_unavailable"
+    r = env.client.patch(f"/api/admin/users/{uid}", headers=h, json={"plan": "pro"})      # an admin can put anyone on any plan
+    assert r.status_code == 200 and r.json()["plan"] == "pro" and user_row(env, email=EMAIL).plan_id == "pro"
+    assert env.client.get("/api/admin/audit", headers=h).json()["events"][0]["action"].endswith("from the free plan to the pro plan")
     assert env.client.patch(f"/api/admin/users/{uid}", headers=h, json={"plan": "free"}).status_code == 200
+    assert user_row(env, email=EMAIL).plan_id == "free"
     import uuid
     assert env.client.patch(f"/api/admin/users/{uuid.uuid4()}", headers=h, json={"status": "active"}).status_code == 404
     assert env.client.patch(f"/api/admin/users/{uid}", headers=h, json={"role": "wizard"}).status_code == 422

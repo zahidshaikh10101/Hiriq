@@ -1,6 +1,6 @@
 """Admin console API (mounted at /api/admin). Every route needs a signed-in admin.
 
-Live data only: users, the overview numbers and the audit log all come from the database.
+Live data only: users, the overview numbers and the audit log all come from the database. An admin can put any user on any plan.
 Safety rules enforced here (not just in the page):
  - nobody can change, suspend or delete their own account;
  - only a superadmin can make someone an admin, or change/suspend/delete another admin.
@@ -131,8 +131,8 @@ def update_user(user_id: uuid.UUID, body: UserPatch, request: Request, actor: Us
 
     if body.plan is not None and body.plan != target.plan_id:
         plan = db.get(Plan, body.plan)
-        if plan is None or not plan.live:
-            raise _err(422, "plan_unavailable", "That plan is not available yet.")
+        if plan is None:
+            raise _err(422, "plan_unavailable", "That plan does not exist.")
         old_plan = target.plan_id
         target.plan_id = plan.id
         audit.record(db, "Users", f"moved {who} from the {old_plan} plan to the {plan.id} plan", actor_id=actor.id,

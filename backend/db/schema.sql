@@ -1,5 +1,29 @@
 -- Hiriq schema (PostgreSQL). Generated from app/db/models.py and app/db/recruiter_models.py; do not edit by hand.
 
+CREATE TABLE external_jobs (
+	id UUID NOT NULL, 
+	provider VARCHAR(30) NOT NULL, 
+	external_id VARCHAR(200) NOT NULL, 
+	title VARCHAR(160) NOT NULL, 
+	company VARCHAR(160), 
+	location VARCHAR(160), 
+	country VARCHAR(2), 
+	remote BOOLEAN NOT NULL, 
+	apply_url VARCHAR(600), 
+	description TEXT NOT NULL, 
+	posted_at TIMESTAMP WITH TIME ZONE, 
+	read JSONB NOT NULL, 
+	last_query VARCHAR(100), 
+	first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_external_job_provider_id UNIQUE (provider, external_id)
+);
+
+CREATE INDEX ix_external_jobs_last_seen ON external_jobs (last_seen_at);
+
+CREATE INDEX ix_external_jobs_title ON external_jobs (title);
+
 CREATE TABLE pending_signups (
 	id UUID NOT NULL, 
 	email VARCHAR(320) NOT NULL, 
@@ -177,6 +201,21 @@ CREATE TABLE candidates (
 
 CREATE INDEX ix_candidates_owner_created ON candidates (owner_id, created_at);
 
+CREATE TABLE external_calls (
+	id BIGSERIAL NOT NULL, 
+	owner_id UUID, 
+	provider VARCHAR(30) DEFAULT 'indeed' NOT NULL, 
+	ok BOOLEAN NOT NULL, 
+	error VARCHAR(200), 
+	latency_ms INTEGER, 
+	results INTEGER, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(owner_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_external_calls_created ON external_calls (created_at);
+
 CREATE TABLE jobs (
 	id UUID NOT NULL, 
 	owner_id UUID NOT NULL, 
@@ -224,6 +263,28 @@ CREATE TABLE otp_codes (
 );
 
 CREATE INDEX ix_otp_destination_created ON otp_codes (destination, created_at);
+
+CREATE TABLE applications (
+	id UUID NOT NULL, 
+	job_id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	resume_label VARCHAR(120) NOT NULL, 
+	resume_text TEXT NOT NULL, 
+	letter_label VARCHAR(120), 
+	letter_text TEXT, 
+	message TEXT, 
+	contact JSONB NOT NULL, 
+	fit_score FLOAT, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_application_job_candidate UNIQUE (job_id, candidate_id), 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE, 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_applications_candidate_created ON applications (candidate_id, created_at);
+
+CREATE INDEX ix_applications_job_created ON applications (job_id, created_at);
 
 CREATE TABLE candidate_job_matches (
 	id UUID NOT NULL, 
@@ -306,52 +367,6 @@ CREATE TABLE match_feedback (
 	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
 	FOREIGN KEY(recruiter_id) REFERENCES users (id) ON DELETE CASCADE
 );
-
-CREATE TABLE applications (
-	id UUID NOT NULL, 
-	job_id UUID NOT NULL, 
-	candidate_id UUID NOT NULL, 
-	resume_label VARCHAR(120) NOT NULL, 
-	resume_text TEXT NOT NULL, 
-	letter_label VARCHAR(120), 
-	letter_text TEXT, 
-	message TEXT, 
-	contact JSONB NOT NULL, 
-	fit_score FLOAT, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	PRIMARY KEY (id), 
-	CONSTRAINT uq_application_job_candidate UNIQUE (job_id, candidate_id), 
-	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE, 
-	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
-);
-
-CREATE INDEX ix_applications_job_created ON applications (job_id, created_at);
-
-CREATE INDEX ix_applications_candidate_created ON applications (candidate_id, created_at);
-
-CREATE TABLE external_jobs (
-	id UUID NOT NULL, 
-	provider VARCHAR(30) NOT NULL, 
-	external_id VARCHAR(200) NOT NULL, 
-	title VARCHAR(160) NOT NULL, 
-	company VARCHAR(160), 
-	location VARCHAR(160), 
-	country VARCHAR(2), 
-	remote BOOLEAN NOT NULL, 
-	apply_url VARCHAR(600), 
-	description TEXT NOT NULL, 
-	posted_at TIMESTAMP WITH TIME ZONE, 
-	read JSONB NOT NULL, 
-	last_query VARCHAR(100), 
-	first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	PRIMARY KEY (id), 
-	CONSTRAINT uq_external_job_provider_id UNIQUE (provider, external_id)
-);
-
-CREATE INDEX ix_external_jobs_last_seen ON external_jobs (last_seen_at);
-
-CREATE INDEX ix_external_jobs_title ON external_jobs (title);
 
 CREATE TABLE pipeline_entries (
 	id UUID NOT NULL, 

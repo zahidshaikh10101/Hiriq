@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter, defaultdict
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,8 +19,9 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_admin
 from app.db.models import User
-from app.db.recruiter_models import AiCall
+from app.db.recruiter_models import AiCall, ExternalCall
 from app.db.session import get_db
+from app.services import externaljobs
 from app.services.timeutil import aware, now
 
 router = APIRouter(tags=["admin"])
@@ -77,6 +78,27 @@ def _reason(error: str | None) -> str:
     return (error or "unknown").split(":")[0].strip()[:60] or "unknown"
 
 
+def _rapidapi(db: Session, start, prev_start, buckets: int, step: int, tz: int, range_: str) -> dict:
+    """The outside job feed (Indeed through RapidAPI): one row per request that left the server. Cache hits are not requests."""
+    every = db.execute(select(ExternalCall.ok, ExternalCall.error, ExternalCall.latency_ms, ExternalCall.results, ExternalCall.created_at)
+                       .where(ExternalCall.created_at >= prev_start).order_by(ExternalCall.created_at.desc())).all()
+    rows = [r for r in every if aware(r.created_at) >= start]
+    ok = sum(1 for r in rows if r.ok)
+    lat = [r.latency_ms for r in rows if r.latency_ms is not None]
+    values, failed, labels = _series(rows, buckets, step, tz)
+    reasons = Counter(_reason(r.error) for r in rows if not r.ok)
+    today = externaljobs._day["count"] if externaljobs._day["date"] == date.today().isoformat() else 0
+    return {
+        "configured": externaljobs.configured(), "host": externaljobs.HOST, "country": externaljobs.country().upper(),
+        "daily_cap": externaljobs._cap(), "used_today": today,
+        "calls": len(rows), "previous_calls": len(every) - len(rows), "ok": ok, "failed": len(rows) - ok,
+        "success_rate": _rate(ok, len(rows)), "avg_latency_ms": _avg(lat), "posts": sum(r.results or 0 for r in rows),
+        "daily": {"values": values, "failed": failed, "labels": labels},
+        "errors": [{"reason": k, "count": v} for k, v in reasons.most_common(TOP)],
+        "recent_failures": [{"at": _iso(r.created_at), "error": (r.error or "unknown")[:160]} for r in rows if not r.ok][:TOP],
+    }
+
+
 @router.get("/ai-usage")
 def ai_usage(range: Literal["7d", "30d", "90d"] = "7d", tz: int = Query(0, ge=-840, le=840),
              actor: User = Depends(require_admin), db: Session | None = Depends(get_db)) -> dict:
@@ -116,4 +138,5 @@ def ai_usage(range: Literal["7d", "30d", "90d"] = "7d", tz: int = Query(0, ge=-8
         "totals": {**_stats(rows), "previous_calls": previous, "users": len(owners)},
         "by_purpose": purposes, "by_model": models, "errors": errors, "top_users": top_users, "recent_failures": recent_failures,
         "daily": {"values": values, "failed": failed, "labels": labels, "sub": sub},
+        "rapidapi": _rapidapi(db, start, prev_start, buckets, step, tz, range),
     }

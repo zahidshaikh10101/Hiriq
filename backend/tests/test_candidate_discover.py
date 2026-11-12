@@ -20,7 +20,7 @@ class Env:
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setenv("SESSION_SECRET", "x" * 40)
-    monkeypatch.delenv("RAPIDAPI_KEY", raising=False)
+    monkeypatch.setenv("RAPIDAPI_KEY", "")   # empty, not removed: a real key in backend/.env must not leak into the tests
     monkeypatch.delenv("EXTERNAL_DAILY_CAP", raising=False)
     mods = {n: importlib.reload(importlib.import_module(n)) for n in RELOAD}
     mods["app.db.init_db"].init_db()
