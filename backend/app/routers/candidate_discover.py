@@ -2,7 +2,7 @@
 
     GET /recommendations    open Hiriq jobs ranked by how well you fit, with why and what is missing (rules only, instant)
     GET /external/status    is the outside job feed switched on?
-    GET /external           search jobs outside Hiriq (?q=&location=&page=): each with which of YOUR skills the posting mentions
+    GET /external           search jobs outside Hiriq, from Indeed (?q=&location=&radius=&page=): each with which of YOUR skills the posting mentions
 
 An outside job has no skill list, so it gets no 0-100 score here. To score one, send its description to POST /match/paste
 (or /rewrite) from the screen. Your location is never scored; it only fills the search box.
@@ -84,32 +84,33 @@ def external_status(actor: User = Depends(require_candidate)) -> dict:
     return {"configured": externaljobs.configured()}
 
 
-def _external(c, user_id: str, q: str, location: str, page: int) -> dict:
+def _external(c, user_id: str, q: str, location: str, page: int, radius: int) -> dict:
     stamps = [t for t in _hits[user_id] if time.time() - t < 3600]
     if len(stamps) >= EXTERNAL_PER_HOUR:
         _hits[user_id] = stamps
         raise _err(429, "slow_down", "That is a lot of searches for one hour. Try again a little later.")
     try:
-        jobs = externaljobs.search(q, location, page)
+        found = externaljobs.search(q, location, page, radius)
     except externaljobs.ExternalError as exc:
         raise _err(exc.status, exc.code, exc.message)
     stamps.append(time.time())
     _hits[user_id] = stamps
+    jobs = [dict(j) for j in found["jobs"]]                  # the cached copy stays untouched
     mine = resume.clean_skills(list(c.skills or []))
     for j in jobs:
         low = j["description"].lower()
         j["skills_in_posting"] = [s for s in mine if resume._skill_pattern(s).search(low)][:12]
     jobs.sort(key=lambda j: -len(j["skills_in_posting"]))
-    return {"configured": True, "q": q, "location": location, "page": page, "your_skills": len(mine), "jobs": jobs}
+    return {"configured": True, "q": q, "location": location, "page": page, "radius": radius, "has_more": found["has_more"], "your_skills": len(mine), "jobs": jobs}
 
 
 @router.get("/external")
 async def external_search(
-    q: str = Query(min_length=2, max_length=100), location: str = Query(default="", max_length=100), page: int = Query(default=1, ge=1, le=5),
+    q: str = Query(min_length=2, max_length=100), location: str = Query(default="", max_length=100), radius: int = Query(default=20, ge=5, le=100), page: int = Query(default=1, ge=1, le=5),
     actor: User = Depends(require_candidate), db: Session | None = Depends(get_db),
 ) -> dict:
     db = _db(db)
     c = _ensure(db, actor)
     if not externaljobs.configured():
         raise _err(503, "not_configured", "The outside job feed is not set up on this server.")
-    return await run_in_threadpool(_external, c, str(actor.id), re.sub(r"\s+", " ", q).strip(), re.sub(r"\s+", " ", location).strip(), page)
+    return await run_in_threadpool(_external, c, str(actor.id), re.sub(r"\s+", " ", q).strip(), re.sub(r"\s+", " ", location).strip(), page, radius)

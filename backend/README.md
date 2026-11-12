@@ -66,7 +66,7 @@ Errors come back as `{"detail": {"code": "...", "message": "..."}}`. Someone els
 | POST | `/jobs/{id}/apply` | `{version_id?, letter_id?, message?}`: apply to an open job. The recruiter gets a copy of the resume text you pick (uploaded or a tailored version), the letter, your message, your contact details and your fit score. 409 if you already applied |
 | GET | `/applications` | your applications, newest first |
 | DELETE | `/applications/{id}` | withdraw: the copy the recruiter had is deleted (removing your resume withdraws them all) |
-| GET | `/external/status`, `/external` | outside job feed (JSearch): `?q=&location=&page=`; needs `RAPIDAPI_KEY`; shows which of your skills each post mentions |
+| GET | `/external/status`, `/external` | outside job feed (Indeed via the Jobs API on RapidAPI): `?q=&location=&radius=&page=`; needs `RAPIDAPI_KEY`; shows which of your skills each post mentions |
 
 **Admin** (`/api/admin`, admin role)
 

@@ -109,14 +109,14 @@ def test_where_you_live_does_not_change_the_ranking(env):
 
 
 # ---------------------------------------------------------------- the outside feed
-def jsearch(*items):
-    return {"status": "OK", "data": list(items)}
+def indeed(*items, token=None):
+    return {"data": list(items), "meta": {"position": 0, "count": len(items), "nextToken": token}, "errors": [], "hasError": False}
 
 
 def item(i, title="Data Analyst", desc="We use SQL and Python every day.", **over):
-    base = {"job_id": f"id-{i}", "job_title": title, "employer_name": "Acme", "job_city": "Pune", "job_state": "MH", "job_country": "IN",
-            "job_is_remote": False, "job_employment_type": "FULLTIME", "job_description": desc, "job_apply_link": "https://acme.example/apply",
-            "job_publisher": "LinkedIn", "job_posted_at_datetime_utc": "2026-11-01T00:00:00.000Z"}
+    base = {"id": f"id-{i}", "title": title, "company": {"name": "Acme", "addresses": [], "image": ""},
+            "location": {"country": "India", "countryCode": "IN", "location": "Pune, Maharashtra"}, "description": desc,
+            "applyUrl": "https://acme.example/apply", "datePublishedTimestamp": 1793577600000, "dateOnIndeedTimestamp": 1793600000000}
     base.update(over)
     return base
 
@@ -129,7 +129,7 @@ def feed(env, monkeypatch, body=None, key="k"):
         env.sent.append(params)
         if isinstance(body, Exception):
             raise body
-        return body if body is not None else jsearch(item(1))
+        return body if body is not None else indeed(item(1))
 
     monkeypatch.setattr(env.ext, "_get", fake)
 
@@ -143,17 +143,19 @@ def test_the_feed_is_off_until_a_key_is_set(env):
 
 def test_outside_jobs_show_which_of_your_skills_they_mention(env, monkeypatch):
     _, h = ready(env)                                                    # skills: SQL, Python
-    feed(env, monkeypatch, jsearch(item(1, "Backend Dev", "We run MySQL and Java."), item(2, "Analyst", "SQL and Python required."),
-                                   item(3, "Sneaky", "x", job_apply_link="javascript:alert(1)")))
+    feed(env, monkeypatch, indeed(item(1, "Backend Dev", "We run MySQL and Java."), item(2, "Analyst", "SQL and Python required."),
+                                  item(3, "Remote Sneaky", "x", applyUrl="javascript:alert(1)")))
     assert env.client.get(f"{ME}/external/status", headers=h).json() == {"configured": True}
     r = env.client.get(f"{ME}/external", headers=h, params={"q": "analyst", "location": "Pune"})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert [j["title"] for j in body["jobs"]] == ["Analyst", "Backend Dev", "Sneaky"] and body["your_skills"] == 2
+    assert [j["title"] for j in body["jobs"]] == ["Analyst", "Backend Dev", "Remote Sneaky"] and body["your_skills"] == 2
     assert body["jobs"][0]["skills_in_posting"] == ["SQL", "Python"] and body["jobs"][1]["skills_in_posting"] == []   # "MySQL" is not "SQL"
     assert body["jobs"][2]["apply_url"] is None and body["jobs"][0]["apply_url"] == "https://acme.example/apply"
-    assert body["jobs"][0]["location"] == "Pune, MH, IN" and "score" not in body["jobs"][0]
-    assert env.sent[0]["query"] == "analyst in Pune" and env.sent[0]["country"] == "in"
+    assert body["jobs"][0]["location"] == "Pune, Maharashtra" and "score" not in body["jobs"][0]
+    assert body["jobs"][0]["posted_at"] == "2026-11-02T00:00:00Z" and body["jobs"][0]["source"] == "Indeed" and body["jobs"][0]["remote"] is False
+    assert body["jobs"][2]["remote"] is True and body["radius"] == 20 and body["has_more"] is False
+    assert env.sent[0] == {"query": "analyst", "location": "Pune", "radius": "20", "radiusType": "km", "sortType": "relevance", "countryCode": "in"}
 
 
 def test_repeat_searches_are_cached_and_limited(env, monkeypatch):
@@ -183,7 +185,7 @@ def test_feed_failures_are_explained_not_leaked(env, monkeypatch):
     feed(env, monkeypatch, body=env.ext.ExternalError("feed_key", "The job feed key is not accepted.", 502))
     r = g("one")
     assert r.status_code == 502 and r.json()["detail"]["code"] == "feed_key" and "k" != r.json()["detail"]["message"]
-    feed(env, monkeypatch, body={"status": "ERROR", "error": {"message": "secret internals"}})
+    feed(env, monkeypatch, body={"hasError": True, "errors": [{"message": "secret internals"}], "data": []})
     r = g("two")
     assert r.status_code == 502 and "secret" not in r.text
     assert g("x").status_code == 422 and env.client.get(f"{ME}/external", headers=h, params={"q": "ok", "page": 9}).status_code == 422
@@ -191,6 +193,24 @@ def test_feed_failures_are_explained_not_leaked(env, monkeypatch):
 
 def test_odd_results_are_cleaned(env, monkeypatch):
     _, h = ready(env)
-    feed(env, monkeypatch, jsearch({"job_title": "No id"}, "not a dict", item(1, "<script>x</script>", "y" * 9000, job_publisher=None)))
+    feed(env, monkeypatch, indeed({"title": "No id"}, "not a dict", item(1, "<script>x</script>", "y" * 9000, datePublishedTimestamp=-5, dateOnIndeedTimestamp="soon")))
     body = env.client.get(f"{ME}/external", headers=h, params={"q": "odd"}).json()
-    assert len(body["jobs"]) == 1 and len(body["jobs"][0]["description"]) == 6000 and body["jobs"][0]["source"] is None
+    assert len(body["jobs"]) == 1 and len(body["jobs"][0]["description"]) == 6000 and body["jobs"][0]["posted_at"] is None
+
+
+def test_later_pages_follow_the_token_of_the_page_before(env, monkeypatch):
+    _, h = ready(env)
+    feed(env, monkeypatch, indeed(item(1), token="TOK-2"))
+    g = lambda **p: env.client.get(f"{ME}/external", headers=h, params={"q": "data scientist", "location": "Mumbai", **p})
+    r = g(page=2)                                                         # nobody has seen page 1 yet: no token to follow
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "start_over" and env.sent == []
+    first = g(radius=50)
+    assert first.status_code == 200 and first.json()["has_more"] is True and env.sent[0]["radius"] == "50"
+    assert g(page=2, radius=50).status_code == 200 and env.sent[1] == {"token": "TOK-2"}
+
+
+def test_a_bad_radius_is_refused(env, monkeypatch):
+    _, h = ready(env)
+    feed(env, monkeypatch)
+    assert env.client.get(f"{ME}/external", headers=h, params={"q": "data", "radius": 1}).status_code == 422
+    assert env.client.get(f"{ME}/external", headers=h, params={"q": "data", "radius": 500}).status_code == 422
