@@ -473,28 +473,44 @@ def test_the_lockout_reply_is_the_same_for_known_and_unknown_emails(env):
 
 
 # ================= usernames =================
-def test_username_is_initials_plus_dob_and_works_for_login(env):
+def test_username_is_first_dot_last_and_works_for_login(env):
     out = complete_signup(env, name="Zahid Salim Shaikh", dob="2001-01-10")
     me = env.client.get("/api/auth/me", headers=auth(out["access_token"])).json()
-    assert me["username"] == "zss100101" and me["dob"] == "2001-01-10"
-    assert env.client.post("/api/auth/login", json={"username": "ZSS100101", "password": PW}).status_code == 200
+    assert me["username"] == "zahid.shaikh" and me["dob"] == "2001-01-10"
+    assert "2001" not in me["username"] and "10" not in me["username"]   # no part of the birth date
+    assert env.client.post("/api/auth/login", json={"username": "ZAHID.SHAIKH", "password": PW}).status_code == 200
+
+
+def test_same_name_gets_a_number_not_a_birth_date(env):
+    first = complete_signup(env, email="a@example.com", name="Zahid Shaikh")
+    second = complete_signup(env, email="b@example.com", name="Zahid Salim Shaikh", dob="1995-03-04")
+    names = [env.client.get("/api/auth/me", headers=auth(o["access_token"])).json()["username"] for o in (first, second)]
+    assert names == ["zahid.shaikh", "zahid.shaikh2"]
+
+
+def test_username_rules_for_unusual_names():
+    from app.services.username import base_username
+    assert base_username("Zoë van der Berg") == "zoe.berg"
+    assert base_username("Sinéad O'Brien") == "sinead.obrien"
+    assert base_username("Madonna") == "madonna"
+    assert base_username("  ") == "user" and base_username("\u0930\u093e\u092e") == "user"
+    assert len(base_username("A" * 60 + " " + "B" * 60)) <= 31
 
 
 def test_username_collisions_get_a_number(env):
-    complete_signup(env, email="a1@example.com", name="Ann Lee", dob="2000-05-04")
-    complete_signup(env, email="a2@example.com", name="Amy Lim", dob="2000-05-04")
-    complete_signup(env, email="a3@example.com", name="Ava Lo", dob="2000-05-04")
+    for e in ("a1@example.com", "a2@example.com", "a3@example.com"):
+        complete_signup(env, email=e, name="Ann Lee", dob="2000-05-04")
     names = sorted(user_row(env, email=e).username for e in ("a1@example.com", "a2@example.com", "a3@example.com"))
-    assert names == ["al040500", "al0405002", "al0405003"]
+    assert names == ["ann.lee", "ann.lee2", "ann.lee3"]
 
 
 def test_username_edge_cases():
     import importlib
     u = importlib.import_module("app.services.username")
-    assert u.initials("Zoë van der Berg") == "zvdb"
-    assert u.initials("  madonna ") == "m"
-    assert u.initials("李 雷") == "u"          # no latin letters: neutral fallback
-    assert u.initials("A B C D E F") == "abcd"  # at most 4
+    assert u.base_username("Zoë van der Berg") == "zoe.berg"
+    assert u.base_username("  madonna ") == "madonna"
+    assert u.base_username("李 雷") == "user"             # no latin letters: neutral fallback
+    assert u.base_username("A B C D E F") == "a.f"        # first and last part only
 
 
 def test_dob_is_validated(env):
@@ -504,17 +520,21 @@ def test_dob_is_validated(env):
     from datetime import date
     too_young = date.today().replace(year=date.today().year - 10).isoformat()
     assert signup(env, dob=too_young).json()["detail"]["code"] == "too_young"
+    # 17 is still a child (the minimum is 18)
+    seventeen = date.today().replace(year=date.today().year - 17, day=1).isoformat()
+    r = signup(env, dob=seventeen)
+    assert r.json()["detail"]["code"] == "too_young" and "18" in r.json()["detail"]["message"]
 
 
-def test_google_user_gets_username_when_they_add_dob_and_it_never_changes(env):
+def test_google_user_gets_username_at_signup_and_it_never_changes(env):
     r = env.client.post("/api/auth/google", json={"credential": "x", "mode": "signup", "consent": True})
-    assert r.json()["needs_profile"] is True
+    assert r.json()["needs_profile"] is True          # still needs a date of birth (18+ check) and a phone
     h = auth(r.json()["access_token"])
-    assert env.client.get("/api/auth/me", headers=h).json().get("username") is None
+    assert env.client.get("/api/auth/me", headers=h).json()["username"] == "ann.lee"
     me = env.client.put("/api/auth/profile", headers=h, json={"dob": "1999-12-31"}).json()
-    assert me["username"] == "al311299"
+    assert me["username"] == "ann.lee"
     me = env.client.put("/api/auth/profile", headers=h, json={"dob": "1990-01-01"}).json()
-    assert me["username"] == "al311299" and me["dob"] == "1990-01-01"  # handle stays stable
+    assert me["username"] == "ann.lee" and me["dob"] == "1990-01-01"  # handle stays stable
 
 
 def test_needs_profile_until_phone_and_dob_present(env):

@@ -38,9 +38,9 @@
     if (!name) return;
     $("#username-value").textContent = name;
     $("#username-row").hidden = false;
-    $("#dob-hint").textContent = "Your username does not change if you edit this. It is not shown to other users.";
+    $("#dob-hint").textContent = "We only use it to check you are 18 or older. It is not shown to other users.";
   }
-  var MIN_AGE = 16;
+  var MIN_AGE = 18;
   function checkDob(value) {
     if (!value) return "";
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -58,7 +58,7 @@
       return;
     }
     var me = res.me;
-    if (me.user) $("#profile-lead").textContent = "Welcome, " + me.user + ". Your date of birth gives you a username; the rest is optional.";
+    if (me.user) $("#profile-lead").textContent = "Welcome, " + me.user + ". Add your date of birth (you must be 18 or older); the rest is optional.";
     showUsername(me.username);
     if (me.dob) $("#dob").value = me.dob;
     if (me.phone) {

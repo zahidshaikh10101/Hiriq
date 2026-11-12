@@ -55,8 +55,8 @@
     return d ? $("#country").value + d : "";
   }
 
-  // ---------- Shared: date of birth (must be a real date and at least 16 years ago) ----------
-  var MIN_AGE = 16;
+  // ---------- Shared: date of birth (must be a real date and at least 18 years ago) ----------
+  var MIN_AGE = 18;
   function checkDob(value) {
     if (!value) return "Add your date of birth.";
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -164,15 +164,32 @@
     document.head.appendChild(s);
   }
 
+  // On the sign-up page Google stays switched off until the Terms box is ticked, so nobody has to click twice.
+  var consentGate = [];
+  function syncConsentGate() {
+    var box = $("#consent");
+    if (!isSignupPage || !box) return;
+    consentGate.forEach(function (el) {
+      var on = box.checked;
+      if (el.tagName === "BUTTON") { el.disabled = !on; }
+      else { el.style.pointerEvents = on ? "" : "none"; el.setAttribute("aria-disabled", on ? "false" : "true"); }
+      el.style.opacity = on ? "" : "0.45";
+      el.title = on ? "" : "Tick the box above to continue";
+    });
+  }
+  if (isSignupPage && $("#consent")) $("#consent").addEventListener("change", syncConsentGate);
+
   $$("[data-google]").forEach(function (btn) {
     function previewNote() {
       notify(msgBox, "info", !API
         ? 'Google sign-in works once the backend is connected: set mode to "api" in assets/js/config.js.'
         : "Add your Google client ID as googleClientId in assets/js/config.js to turn this on.");
     }
-    if (!API || !cfg.googleClientId) { btn.addEventListener("click", previewNote); return; }
+    if (!API || !cfg.googleClientId) { btn.addEventListener("click", previewNote); consentGate.push(btn); syncConsentGate(); return; }
 
     var width = Math.min(400, btn.offsetWidth || 340);
+    consentGate.push(btn);
+    syncConsentGate();
     btn.addEventListener("click", function () {
       notify(msgBox, "error", "Google sign-in could not load. Check your connection, and open this page from " + cfg.apiBase + ".");
     });
@@ -181,6 +198,8 @@
       var holder = document.createElement("div");
       holder.style.cssText = "display:flex;justify-content:center;min-height:44px";
       btn.parentNode.insertBefore(holder, btn.nextSibling);
+      consentGate.push(holder);
+      syncConsentGate();
       window.google.accounts.id.renderButton(holder, {
         type: "standard", theme: "filled_black", size: "large", shape: "pill", logo_alignment: "left",
         text: isSignupPage ? "signup_with" : "continue_with", width: width
@@ -192,14 +211,6 @@
   // ================= LOGIN =================
   var emailForm = $("#email-form");
   if (emailForm) {
-    // Phone codes cost money, so phone login is switched off. Set phoneLogin: true in config.js only if you add SMS back.
-    if (cfg.phoneLogin !== true) {
-      var seg = $(".segmented");
-      if (seg) seg.hidden = true;
-      ["#phone-form", "#otp-form"].forEach(function (sel) { var el = $(sel); if (el) el.hidden = true; });
-      // The "or" divider between Google and the email form stays; only the tab switcher goes.
-    }
-
     emailForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var id = $("#identifier").value;
@@ -243,7 +254,6 @@
         $$("[data-role]").forEach(function (c) {
           c.setAttribute("aria-pressed", c === card ? "true" : "false");
         });
-        $("#alerts-row").hidden = signupRole !== "candidate";
         ["candidate", "recruiter"].forEach(function (r) {
           var el = $("#aside-" + r);
           el.hidden = r !== signupRole;
@@ -340,7 +350,7 @@
       signupEmail = $("#email").value.trim().toLowerCase();
       window.HiriqAuth.signup({
         name: $("#name").value, email: signupEmail, dob: $("#dob").value, phone: fullPhone(), password: pwInput.value,
-        role: signupRole, alerts: $("#alerts").checked, consent: $("#consent").checked
+        role: signupRole, consent: $("#consent").checked
       }).then(function (res) {
         btn.disabled = false;
         if (!res.ok) { notify(msgBox, "error", res.error); return; }

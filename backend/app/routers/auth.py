@@ -35,7 +35,7 @@ from app.services.timeutil import aware, now
 router = APIRouter(tags=["auth"])
 log = logging.getLogger("hiriq.auth")
 
-MIN_AGE_YEARS = 16
+MIN_AGE_YEARS = 18  # under 18 is a child under India's data protection law, and cannot form a contract
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -75,10 +75,10 @@ class SignupIn(BaseModel):
     name: str
     email: str
     password: str
-    dob: str  # date of birth, YYYY-MM-DD; used with the name's initials to make the username
+    dob: str  # date of birth, YYYY-MM-DD; used only to check the person is 18 or older
     phone: str = ""  # optional, +<country code><digits>
     role: Literal["candidate", "recruiter"] = "candidate"
-    alerts: bool = True
+    alerts: bool = False  # job alerts are not built yet; nothing is promised or switched on
     consent: bool = False
 
 
@@ -105,7 +105,7 @@ class GoogleIn(BaseModel):
 
 
 class ProfileIn(BaseModel):
-    dob: str | None = None  # YYYY-MM-DD; creates the username if the account has none
+    dob: str | None = None  # YYYY-MM-DD; checked for the 18+ rule
     phone: str | None = None  # "" clears it
     designation: str | None = None
     company: str | None = None
@@ -252,7 +252,7 @@ def signup(body: SignupIn, request: Request, db: Session | None = Depends(get_db
     pending.phone_e164 = phone
     pending.password_hash = hash_password(body.password)
     pending.role = body.role
-    pending.job_alerts = body.alerts if body.role == "candidate" else False
+    pending.job_alerts = False
     pending.token_hash = _token_hash(token)
     pending.consented_at = t
     pending.expires_at = t + timedelta(hours=PENDING_SIGNUP_HOURS)
@@ -478,10 +478,11 @@ def google_sign_in(body: GoogleIn, request: Request, db: Session | None = Depend
                 raise _err(422, "consent_required", "Accept the Terms and Privacy Policy to continue.")
             user = User(
                 email=info["email"], full_name=(info["name"] or info["email"].split("@")[0])[:120],
-                role=body.role, email_verified=True, consented_at=now(), job_alerts=body.role == "candidate",
+                role=body.role, email_verified=True, consented_at=now(), job_alerts=False,
             )
             db.add(user)
             db.flush()
+            assign_username(db, user)
             audit.record(db, "Users", "signed up with Google", actor_id=user.id, actor_label=user.full_name,
                          target_user_id=user.id, ip=_ip(request))
         db.add(AuthIdentity(user_id=user.id, provider="google", subject=info["sub"], email=info["email"]))
@@ -505,7 +506,7 @@ def update_profile(body: ProfileIn, request: Request, user: User = Depends(curre
     db = _need_db(db)
     if body.dob is not None and body.dob.strip():
         user.date_of_birth = _dob(body.dob)
-        assign_username(db, user)  # only when there is none yet; an existing username never changes
+        assign_username(db, user)  # only when there is none yet (older Google accounts); an existing username never changes
     if body.phone is not None:
         user.phone_e164 = _phone(body.phone) if body.phone.strip() else None
     if body.designation is not None:

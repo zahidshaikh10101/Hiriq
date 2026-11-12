@@ -40,7 +40,7 @@ CREATE TABLE users (
 	date_of_birth DATE, 
 	designation VARCHAR(120), 
 	company VARCHAR(120), 
-	job_alerts BOOLEAN DEFAULT true NOT NULL, 
+	job_alerts BOOLEAN DEFAULT false NOT NULL, 
 	consented_at TIMESTAMP WITH TIME ZONE, 
 	failed_logins INTEGER DEFAULT '0' NOT NULL, 
 	locked_until TIMESTAMP WITH TIME ZONE, 

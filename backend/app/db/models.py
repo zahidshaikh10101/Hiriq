@@ -53,7 +53,7 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
-    # Login handle. Made automatically from the name's initials + date of birth (e.g. zss100801); admins can have a custom one.
+    # Login handle. Made automatically as firstname.lastname (e.g. zahid.shaikh); admins can have a custom one.
     username: Mapped[str | None] = mapped_column(String(40), unique=True)
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     password_hash: Mapped[str | None] = mapped_column(String(255))  # NULL for Google-only accounts
@@ -70,7 +70,7 @@ class User(Base):
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     designation: Mapped[str | None] = mapped_column(String(120))
     company: Mapped[str | None] = mapped_column(String(120))
-    job_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.true())
+    job_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.false())
     consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     failed_logins: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

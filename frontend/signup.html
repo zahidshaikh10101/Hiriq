@@ -43,6 +43,11 @@
             </div>
           </div>
 
+          <label class="check-row consent-gate" for="consent">
+            <input id="consent" type="checkbox">
+            <span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>, and I consent to Hiriq processing resumes I upload to produce match scores.</span>
+          </label>
+
           <button type="button" class="btn btn-ghost glass btn-google" data-google>
             <svg class="i" width="22" height="22" aria-hidden="true"><use href="#i-mail"></use></svg>Sign up with Google
           </button>
@@ -60,7 +65,7 @@
             <div class="field-group">
               <label class="label" for="dob">Date of birth</label>
               <input class="field" id="dob" type="date" autocomplete="bday" min="1900-01-01" style="color-scheme:dark">
-              <span class="hint">Your username is made from your initials and birth date (for example zss100101), so it will contain your birth date. You can log in with it or your email.</span>
+              <span class="hint">We only use this to check you are 18 or older. It is not shown to other users and it is not part of your username.</span>
             </div>
             <div class="field-group">
               <label class="label" for="phone">Mobile number <span class="faint">(optional)</span></label>
@@ -85,14 +90,6 @@
               <span class="hint">At least 8 characters. Mix cases, numbers and a symbol to make it stronger.</span>
             </div>
 
-            <label class="check-row" for="alerts" id="alerts-row">
-              <input id="alerts" type="checkbox" checked>
-              Send me job alerts every morning for roles that match my profile. You can change this or unsubscribe any time.
-            </label>
-            <label class="check-row" for="consent">
-              <input id="consent" type="checkbox">
-              <span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>, and I consent to Hiriq processing resumes I upload to produce match scores.</span>
-            </label>
 
             <button type="submit" class="btn btn-grad btn-block">Create account <svg class="i" width="18" height="18" aria-hidden="true"><use href="#i-arrow"></use></svg></button>
           </form>

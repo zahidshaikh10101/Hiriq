@@ -138,7 +138,7 @@
     if (cfg.mode !== "api") return demoOnly();
     return post("/api/auth/signup", {
       name: f.name, email: f.email, dob: f.dob, phone: f.phone || "", password: f.password,
-      role: f.role, alerts: !!f.alerts, consent: !!f.consent
+      role: f.role, consent: !!f.consent
     }).then(function (r) {
       if (r.ok) signupToken = r.data.signup_token || "";
       return r.ok ? { ok: true, emailMasked: r.data.email_masked } : { ok: false, error: r.error, code: r.code };

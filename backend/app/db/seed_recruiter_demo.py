@@ -39,7 +39,7 @@ DEMO_RECRUITER = {
     "company": "Northwind Analytics",
     "designation": "Talent Acquisition Lead",
     "password": "TestRecruiter@123",
-    "dob": date(1994, 6, 15),   # fictional; with the initials this makes the username km150694
+    "dob": date(1994, 6, 15),   # fictional; used only for the 18+ rule
 }
 
 JOBS = [
@@ -197,7 +197,7 @@ def create_demo_recruiter(db) -> tuple[User, str]:
         date_of_birth=d["dob"], job_alerts=False, consented_at=now(),
     )
     db.add(user)
-    assign_username(db, user)   # initials + DDMMYY, the same rule real sign-ups use
+    assign_username(db, user)   # firstname.lastname, the same rule real sign-ups use
     db.commit()
     return user, f"Created the demo recruiter {d['email']} (username: {user.username}, password: {d['password']})."
 
