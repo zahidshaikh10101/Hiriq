@@ -9,6 +9,9 @@ What it does today:
  - candidates.visible_to_recruiters (new column, default false: members opt in) and candidate_job_matches (new table)
  - resume_versions, interview_preps and cover_letters (new tables): saved tailored resumes, interview prep, cover letters
  - applications (new table): a member's application to an open job, with the resume and letter sent
+ - external_jobs.apply_key, dedupe_key and listed_at (new columns, filled for the jobs already stored; the apply_key is unique, so
+   an old duplicate keeps an empty apply_key instead of failing), and the tables for job preferences, the personal job feed and the
+   outside-job tracker (candidate_preferences, candidate_feed, external_applications)
  - pending_signups (new table): an unverified sign-up now waits there instead of in `users`
    Old half-finished sign-ups left in `users` (never verified, no Google link, never signed in) are removed, because
    their password could have been set by someone other than the email's owner.
@@ -21,8 +24,57 @@ from sqlalchemy import inspect, text
 from app.db import models  # noqa: F401  (registers the tables)
 from app.db.init_db import init_db
 from app.db.session import engine
+from app.services import jobkeys
 
 NEW_PURPOSES = "purpose IN ('signup', 'reset')"
+
+
+def _upgrade_external_jobs(conn) -> list[str]:
+    """New key and date columns on external_jobs, filled for the rows already there. Safe to run again."""
+    done: list[str] = []
+    cols = {c["name"] for c in inspect(conn).get_columns("external_jobs")}
+    pg = conn.dialect.name == "postgresql"
+    if "apply_key" not in cols:
+        conn.execute(text("ALTER TABLE external_jobs ADD COLUMN apply_key VARCHAR(64)"))
+        done.append("added external_jobs.apply_key")
+    if "dedupe_key" not in cols:
+        conn.execute(text("ALTER TABLE external_jobs ADD COLUMN dedupe_key VARCHAR(64)"))
+        done.append("added external_jobs.dedupe_key")
+    if "listed_at" not in cols:
+        # SQLite cannot add a NOT NULL column with a changing default, so only PostgreSQL gets the constraint here
+        conn.execute(text("ALTER TABLE external_jobs ADD COLUMN listed_at TIMESTAMP WITH TIME ZONE"
+                          + (" NOT NULL DEFAULT now()" if pg else "")))
+        conn.execute(text("UPDATE external_jobs SET listed_at = COALESCE(posted_at, first_seen_at)"))
+        done.append("added external_jobs.listed_at (posted date, else first seen)")
+
+    # Fill keys for rows that have none yet. The first row with a link keeps it; a later copy is left without an apply_key.
+    rows = conn.execute(text("SELECT id, title, company, location, apply_url, apply_key, dedupe_key FROM external_jobs")).mappings().all()
+    taken = {r["apply_key"] for r in rows if r["apply_key"]}
+    filled = 0
+    for r in rows:
+        akey = r["apply_key"] or jobkeys.apply_key(r["apply_url"])
+        if akey and akey in taken and akey != r["apply_key"]:
+            akey = None
+        dkey = r["dedupe_key"] or jobkeys.dedupe_key(r["title"], r["company"], r["location"])
+        if (akey, dkey) != (r["apply_key"], r["dedupe_key"]):
+            conn.execute(text("UPDATE external_jobs SET apply_key = :a, dedupe_key = :d WHERE id = :id"),
+                         {"a": akey or r["apply_key"], "d": dkey, "id": r["id"]})
+            if akey:
+                taken.add(akey)
+            filled += 1
+    if filled:
+        done.append(f"filled the duplicate-detection keys of {filled} outside job(s)")
+
+    for name, ddl in (
+        ("uq_external_jobs_apply_key", "CREATE UNIQUE INDEX IF NOT EXISTS uq_external_jobs_apply_key ON external_jobs (apply_key)"),
+        ("ix_external_jobs_dedupe_key", "CREATE INDEX IF NOT EXISTS ix_external_jobs_dedupe_key ON external_jobs (dedupe_key)"),
+        ("ix_external_jobs_listed_at", "CREATE INDEX IF NOT EXISTS ix_external_jobs_listed_at ON external_jobs (listed_at)"),
+    ):
+        existing = {i["name"] for i in inspect(conn).get_indexes("external_jobs")}
+        if name not in existing:
+            conn.execute(text(ddl))
+            done.append(f"added index {name}")
+    return done
 
 
 def upgrade() -> list[str]:
@@ -44,6 +96,8 @@ def upgrade() -> list[str]:
         if "visible_to_recruiters" not in cand_cols:
             conn.execute(text("ALTER TABLE candidates ADD COLUMN visible_to_recruiters BOOLEAN NOT NULL DEFAULT false"))
             done.append("added candidates.visible_to_recruiters (members are hidden from recruiters until they opt in)")
+
+        done += _upgrade_external_jobs(conn)
 
         stale = conn.execute(text(
             "DELETE FROM users WHERE email_verified = :no AND password_hash IS NOT NULL AND role <> 'admin' "

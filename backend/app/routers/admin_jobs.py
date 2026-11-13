@@ -28,7 +28,7 @@ from app.db.models import User
 from app.db.recruiter_models import ExternalJob, Job
 from app.db.session import get_db
 from app.routers.jobs import FIELDS, MIN_JD_CHARS, JobIn
-from app.services import audit
+from app.services import audit, jobkeys
 from app.services.timeutil import aware, now
 
 router = APIRouter(tags=["admin"])
@@ -268,6 +268,17 @@ def delete_portal_job(job_id: str, request: Request, actor: User = Depends(requi
 
 
 # ---------------- outside jobs ----------------
+def _set_keys(db: Session, job: ExternalJob) -> None:
+    """Fill the duplicate-detection keys. An apply link already in the library cannot be added a second time."""
+    akey = jobkeys.apply_key(job.apply_url)
+    if akey:
+        clash = db.scalars(select(ExternalJob).where(ExternalJob.apply_key == akey)).first()
+        if clash is not None and clash.id != job.id:
+            raise _err(409, "duplicate", f"That apply link is already in the library (as {clash.title}).")
+    job.apply_key = akey
+    job.dedupe_key = jobkeys.dedupe_key(job.title, job.company, job.location)
+
+
 @router.post("/jobs/outside", status_code=201)
 def create_outside_job(body: OutsideJobIn, request: Request, actor: User = Depends(require_admin),
                        db: Session | None = Depends(get_db)) -> dict:
@@ -275,6 +286,7 @@ def create_outside_job(body: OutsideJobIn, request: Request, actor: User = Depen
     job = ExternalJob(provider="manual", external_id=f"manual-{uuid.uuid4()}", title=body.title, company=body.company,
                       location=body.location, remote=body.remote, apply_url=body.apply_url, description=body.description,
                       read={}, last_query=None)
+    _set_keys(db, job)
     db.add(job)
     audit.record(db, "Data", f"added the outside job {job.title}", actor_id=actor.id, actor_label=_label(actor), ip=_ip(request))
     db.commit()
@@ -291,6 +303,7 @@ def update_outside_job(job_id: str, body: OutsideJobIn, request: Request, actor:
         raise _err(404, "not_found", "That job no longer exists.")
     job.title, job.company, job.location = body.title, body.company, body.location
     job.remote, job.apply_url, job.description = body.remote, body.apply_url, body.description
+    _set_keys(db, job)
     job.read = {}                                  # the reader's notes belong to the old text; they are rebuilt when needed
     audit.record(db, "Data", f"edited the outside job {job.title}", actor_id=actor.id, actor_label=_label(actor), ip=_ip(request))
     db.commit()

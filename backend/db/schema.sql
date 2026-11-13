@@ -14,15 +14,24 @@ CREATE TABLE external_jobs (
 	posted_at TIMESTAMP WITH TIME ZONE, 
 	read JSONB NOT NULL, 
 	last_query VARCHAR(100), 
+	apply_key VARCHAR(64), 
+	dedupe_key VARCHAR(64), 
+	listed_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	PRIMARY KEY (id), 
 	CONSTRAINT uq_external_job_provider_id UNIQUE (provider, external_id)
 );
 
+CREATE INDEX ix_external_jobs_dedupe_key ON external_jobs (dedupe_key);
+
 CREATE INDEX ix_external_jobs_last_seen ON external_jobs (last_seen_at);
 
+CREATE INDEX ix_external_jobs_listed_at ON external_jobs (listed_at);
+
 CREATE INDEX ix_external_jobs_title ON external_jobs (title);
+
+CREATE UNIQUE INDEX uq_external_jobs_apply_key ON external_jobs (apply_key);
 
 CREATE TABLE pending_signups (
 	id UUID NOT NULL, 
@@ -286,6 +295,27 @@ CREATE INDEX ix_applications_candidate_created ON applications (candidate_id, cr
 
 CREATE INDEX ix_applications_job_created ON applications (job_id, created_at);
 
+CREATE TABLE candidate_feed (
+	id BIGSERIAL NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	external_job_id UUID, 
+	job_id UUID, 
+	score FLOAT NOT NULL, 
+	rank INTEGER NOT NULL, 
+	breakdown JSONB, 
+	model_version VARCHAR(40), 
+	fetched_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_candidate_feed_one_job CHECK ((job_id IS NULL AND external_job_id IS NOT NULL) OR (job_id IS NOT NULL AND external_job_id IS NULL)), 
+	CONSTRAINT uq_feed_candidate_external UNIQUE (candidate_id, external_job_id), 
+	CONSTRAINT uq_feed_candidate_job UNIQUE (candidate_id, job_id), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(external_job_id) REFERENCES external_jobs (id) ON DELETE CASCADE, 
+	FOREIGN KEY(job_id) REFERENCES jobs (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_candidate_feed_candidate_rank ON candidate_feed (candidate_id, rank);
+
 CREATE TABLE candidate_job_matches (
 	id UUID NOT NULL, 
 	candidate_id UUID NOT NULL, 
@@ -302,6 +332,19 @@ CREATE TABLE candidate_job_matches (
 );
 
 CREATE INDEX ix_cmatch_candidate_score ON candidate_job_matches (candidate_id, score);
+
+CREATE TABLE candidate_preferences (
+	candidate_id UUID NOT NULL, 
+	locations JSONB NOT NULL, 
+	roles JSONB NOT NULL, 
+	job_types JSONB NOT NULL, 
+	work_modes JSONB NOT NULL, 
+	last_refreshed_at TIMESTAMP WITH TIME ZONE, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (candidate_id), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
+);
 
 CREATE TABLE cover_letters (
 	id UUID NOT NULL, 
@@ -320,6 +363,29 @@ CREATE TABLE cover_letters (
 );
 
 CREATE INDEX ix_cover_letters_candidate_created ON cover_letters (candidate_id, created_at);
+
+CREATE TABLE external_applications (
+	id UUID NOT NULL, 
+	candidate_id UUID NOT NULL, 
+	external_job_id UUID, 
+	job_key VARCHAR(64) NOT NULL, 
+	title VARCHAR(160) NOT NULL, 
+	company VARCHAR(160), 
+	location VARCHAR(160), 
+	apply_url VARCHAR(600), 
+	status VARCHAR(12) DEFAULT 'saved' NOT NULL, 
+	notes TEXT, 
+	applied_at TIMESTAMP WITH TIME ZONE, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_external_applications_status CHECK (status IN ('saved', 'applied', 'interview', 'offer', 'rejected')), 
+	CONSTRAINT uq_external_application_candidate_job UNIQUE (candidate_id, job_key), 
+	FOREIGN KEY(candidate_id) REFERENCES candidates (id) ON DELETE CASCADE, 
+	FOREIGN KEY(external_job_id) REFERENCES external_jobs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX ix_external_applications_candidate_status ON external_applications (candidate_id, status);
 
 CREATE TABLE interview_preps (
 	id UUID NOT NULL, 

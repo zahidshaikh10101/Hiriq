@@ -117,7 +117,7 @@ def indeed(*items, token=None):
 def item(i, title="Data Analyst", desc="We use SQL and Python every day.", **over):
     base = {"id": f"id-{i}", "title": title, "company": {"name": "Acme", "addresses": [], "image": ""},
             "location": {"country": "India", "countryCode": "IN", "location": "Pune, Maharashtra"}, "description": desc,
-            "applyUrl": "https://acme.example/apply", "datePublishedTimestamp": 1793577600000, "dateOnIndeedTimestamp": 1793600000000}
+            "applyUrl": f"https://acme.example/apply/{i}", "datePublishedTimestamp": 1793577600000, "dateOnIndeedTimestamp": 1793600000000}
     base.update(over)
     return base
 
@@ -152,7 +152,7 @@ def test_outside_jobs_show_which_of_your_skills_they_mention(env, monkeypatch):
     body = r.json()
     assert [j["title"] for j in body["jobs"]] == ["Analyst", "Backend Dev", "Remote Sneaky"] and body["your_skills"] == 2
     assert body["jobs"][0]["skills_in_posting"] == ["SQL", "Python"] and body["jobs"][1]["skills_in_posting"] == []   # "MySQL" is not "SQL"
-    assert body["jobs"][2]["apply_url"] is None and body["jobs"][0]["apply_url"] == "https://acme.example/apply"
+    assert body["jobs"][2]["apply_url"] is None and body["jobs"][0]["apply_url"] == "https://acme.example/apply/2"
     assert body["jobs"][0]["location"] == "Pune, Maharashtra" and "score" not in body["jobs"][0]
     assert body["jobs"][0]["posted_at"] == "2026-11-02T00:00:00Z" and body["jobs"][0]["source"] == "Indeed" and body["jobs"][0]["remote"] is False
     assert body["jobs"][2]["remote"] is True and body["radius"] == 20 and body["has_more"] is False

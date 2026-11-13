@@ -28,6 +28,11 @@ CANDIDATE_SOURCES = ("upload", "platform")
 EVENT_KINDS = ("job", "resume", "match", "pipeline")
 AI_PURPOSES = ("jd", "parse", "match", "ask", "other")
 STRONG_SCORE = 70  # a match at or above this counts as "strong" on the overview
+# Job preferences a candidate sets, and the tracker for outside jobs (see CandidatePreference, ExternalApplication)
+PREF_JOB_TYPES = ("full-time", "part-time", "contract", "internship")
+PREF_WORK_MODES = ("onsite", "hybrid", "remote")
+PREF_MAX = {"locations": 5, "roles": 5}            # how many of each a candidate may keep
+EXTERNAL_STATUSES = ("saved", "applied", "interview", "offer", "rejected")
 
 
 class Job(Base):
@@ -233,6 +238,9 @@ class ExternalJob(Base):
         UniqueConstraint("provider", "external_id", name="uq_external_job_provider_id"),
         Index("ix_external_jobs_last_seen", "last_seen_at"),
         Index("ix_external_jobs_title", "title"),
+        Index("uq_external_jobs_apply_key", "apply_key", unique=True),   # one apply link = one job (NULLs may repeat)
+        Index("ix_external_jobs_dedupe_key", "dedupe_key"),
+        Index("ix_external_jobs_listed_at", "listed_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -248,6 +256,11 @@ class ExternalJob(Base):
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     read: Mapped[dict] = mapped_column(Json, nullable=False, default=dict)
     last_query: Mapped[str | None] = mapped_column(String(100))
+    # sha-256 of the normalized apply link, and of title + company + city (see app/services/jobkeys.py)
+    apply_key: Mapped[str | None] = mapped_column(String(64))
+    dedupe_key: Mapped[str | None] = mapped_column(String(64))
+    # The date the post counts from for the 30-day rule: posted_at, else the day Hiriq first saw it.
+    listed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -343,3 +356,79 @@ class ExternalCall(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     results: Mapped[int | None] = mapped_column(Integer)               # posts returned
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class CandidatePreference(Base):
+    """What kind of job a candidate wants: places, roles, job types and work modes. One row per candidate; each list may be
+    empty (empty means "no preference"). Also remembers when the personal feed was last refreshed, which is what limits the
+    refresh to once a day. Deleting the candidate deletes this."""
+
+    __tablename__ = "candidate_preferences"
+
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), primary_key=True)
+    locations: Mapped[list] = mapped_column(Json, nullable=False, default=list)    # city names, at most PREF_MAX["locations"]
+    roles: Mapped[list] = mapped_column(Json, nullable=False, default=list)        # job titles, at most PREF_MAX["roles"]
+    job_types: Mapped[list] = mapped_column(Json, nullable=False, default=list)    # from PREF_JOB_TYPES
+    work_modes: Mapped[list] = mapped_column(Json, nullable=False, default=list)   # from PREF_WORK_MODES
+    last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CandidateFeedItem(Base):
+    """One job in a candidate's personal feed: an outside job (external_job_id) or an open Hiriq job (job_id), never both.
+    `rank` is the position in the feed (1 = best). `breakdown` holds the score of each technique and the weights used, so the
+    blend can be changed later and old rows still explain themselves. `fetched_at` is when the row was last built.
+    The row goes away with the job (for example when an outside job turns 30 days old) or with the candidate."""
+
+    __tablename__ = "candidate_feed"
+    __table_args__ = (
+        CheckConstraint(
+            "(job_id IS NULL AND external_job_id IS NOT NULL) OR (job_id IS NOT NULL AND external_job_id IS NULL)",
+            name="ck_candidate_feed_one_job",
+        ),
+        UniqueConstraint("candidate_id", "external_job_id", name="uq_feed_candidate_external"),
+        UniqueConstraint("candidate_id", "job_id", name="uq_feed_candidate_job"),
+        Index("ix_candidate_feed_candidate_rank", "candidate_id", "rank"),
+    )
+
+    id: Mapped[int] = mapped_column(BigId, primary_key=True, autoincrement=True)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    external_job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("external_jobs.id", ondelete="CASCADE"))
+    job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"))
+    score: Mapped[float] = mapped_column(Float, nullable=False)                    # the final 0-100 score used to rank
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    breakdown: Mapped[dict | None] = mapped_column(Json)                           # {"rules": 71, "ml": null, "genai": null, "weights": {...}}
+    model_version: Mapped[str | None] = mapped_column(String(40))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ExternalApplication(Base):
+    """A candidate's own tracker for an outside job: saved, applied, interview, offer or rejected, with notes. Hiriq cannot see
+    what happens on the other site, so the candidate keeps the status up to date. The job's title, company, place and link are
+    copied here, so the entry stays readable after the post leaves the library. One entry per candidate per job (`job_key`)."""
+
+    __tablename__ = "external_applications"
+    __table_args__ = (
+        CheckConstraint(_in("status", EXTERNAL_STATUSES), name="ck_external_applications_status"),
+        UniqueConstraint("candidate_id", "job_key", name="uq_external_application_candidate_job"),
+        Index("ix_external_applications_candidate_status", "candidate_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False)
+    external_job_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("external_jobs.id", ondelete="SET NULL"))
+    job_key: Mapped[str] = mapped_column(String(64), nullable=False)               # jobkeys.job_key of the post
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    company: Mapped[str | None] = mapped_column(String(160))
+    location: Mapped[str | None] = mapped_column(String(160))
+    apply_url: Mapped[str | None] = mapped_column(String(600))
+    status: Mapped[str] = mapped_column(String(12), nullable=False, server_default="saved")
+    notes: Mapped[str | None] = mapped_column(Text)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))   # set when the status first becomes applied
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )

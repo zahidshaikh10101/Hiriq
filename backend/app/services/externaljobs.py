@@ -1,7 +1,8 @@
 """Jobs from outside Hiriq, through the "Jobs API" (jobs-api14) on RapidAPI: Indeed search.
 
 Switched on only when RAPIDAPI_KEY is set in backend/.env (never in code or in git). Optional: EXTERNAL_COUNTRY (two letters,
-default "in"), EXTERNAL_DAILY_CAP (searches the whole server may make per day, default 100: the free plan is small).
+default "in"), EXTERNAL_DAILY_CAP (searches the whole server may make per day, default 100), EXTERNAL_MONTHLY_CAP
+(searches per calendar month, default 250 = the RapidAPI plan; counted from the request log, so restarts cannot reset it).
 Everything that comes back is untrusted text from the internet: titles and descriptions are shown escaped, never run, and an
 apply link is kept only if it is a plain http(s) address. Results are cached for 15 minutes.
 
@@ -51,6 +52,30 @@ def _cap() -> int:
         return int(os.getenv("EXTERNAL_DAILY_CAP", "100"))
     except ValueError:
         return 100
+
+
+def _monthly_cap() -> int:
+    try:
+        return int(os.getenv("EXTERNAL_MONTHLY_CAP", "250"))
+    except ValueError:
+        return 250
+
+
+def used_this_month() -> int:
+    """Requests sent to the feed this calendar month (UTC), counted from the log so a restart cannot reset it."""
+    if db_session.SessionLocal is None:
+        return 0
+    try:
+        from sqlalchemy import func, select
+
+        from app.db.recruiter_models import ExternalCall
+
+        now = datetime.now(timezone.utc)
+        start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+        with db_session.SessionLocal() as db:
+            return int(db.scalar(select(func.count()).select_from(ExternalCall).where(ExternalCall.created_at >= start)) or 0)
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 def _record(ok: bool, started: float, error: str | None = None, results: int | None = None) -> None:
@@ -154,6 +179,8 @@ def search(query: str, location: str = "", page: int = 1, radius_km: int = 20) -
         _day.update(date=today, count=0)
     if _day["count"] >= _cap():
         raise ExternalError("feed_busy", "The outside job feed has reached today's limit. Try again tomorrow.")
+    if used_this_month() >= _monthly_cap():
+        raise ExternalError("monthly_limit", "The outside job feed has used its allowance for this month.")
     _day["count"] += 1
     started = time.monotonic()
     try:

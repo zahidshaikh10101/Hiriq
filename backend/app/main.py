@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db import session as db_session
-from app.routers import admin, admin_ai, admin_jobs, applicants, ask, auth, candidate, candidate_apply, candidate_discover, candidate_letters, candidate_prep, candidate_resume, candidates, health, jobs, matches, pipeline, recruiter
+from app.routers import admin, admin_ai, admin_jobs, applicants, ask, auth, candidate, candidate_apply, candidate_discover, candidate_letters, candidate_prefs, candidate_prep, candidate_resume, candidates, health, jobs, matches, pipeline, recruiter
 
 log = logging.getLogger("hiriq")
 
@@ -63,6 +63,7 @@ app.include_router(applicants.router, prefix="/api/recruiter")
 app.include_router(candidate.router, prefix="/api/candidate")
 app.include_router(candidate_resume.router, prefix="/api/candidate")
 app.include_router(candidate_discover.router, prefix="/api/candidate")
+app.include_router(candidate_prefs.router, prefix="/api/candidate")
 app.include_router(candidate_prep.router, prefix="/api/candidate")
 app.include_router(candidate_letters.router, prefix="/api/candidate")
 app.include_router(candidate_apply.router, prefix="/api/candidate")
