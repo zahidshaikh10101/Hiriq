@@ -12,6 +12,7 @@ What it does today:
  - external_jobs.apply_key, dedupe_key and listed_at (new columns, filled for the jobs already stored; the apply_key is unique, so
    an old duplicate keeps an empty apply_key instead of failing), and the tables for job preferences, the personal job feed and the
    outside-job tracker (candidate_preferences, candidate_feed, external_applications)
+ - external_jobs.employment_type, salary_text, source_site and apply_links (new columns, filled by the Google Jobs scraper)
  - pending_signups (new table): an unverified sign-up now waits there instead of in `users`
    Old half-finished sign-ups left in `users` (never verified, no Google link, never signed in) are removed, because
    their password could have been set by someone other than the email's owner.
@@ -46,6 +47,13 @@ def _upgrade_external_jobs(conn) -> list[str]:
                           + (" NOT NULL DEFAULT now()" if pg else "")))
         conn.execute(text("UPDATE external_jobs SET listed_at = COALESCE(posted_at, first_seen_at)"))
         done.append("added external_jobs.listed_at (posted date, else first seen)")
+    for col, ddl in (("employment_type", "VARCHAR(40)"), ("salary_text", "VARCHAR(80)"), ("source_site", "VARCHAR(80)")):
+        if col not in cols:
+            conn.execute(text(f"ALTER TABLE external_jobs ADD COLUMN {col} {ddl}"))
+            done.append(f"added external_jobs.{col}")
+    if "apply_links" not in cols:
+        conn.execute(text("ALTER TABLE external_jobs ADD COLUMN apply_links " + ("JSONB NOT NULL DEFAULT '[]'::jsonb" if pg else "JSON NOT NULL DEFAULT '[]'")))
+        done.append("added external_jobs.apply_links")
 
     # Fill keys for rows that have none yet. The first row with a link keeps it; a later copy is left without an apply_key.
     rows = conn.execute(text("SELECT id, title, company, location, apply_url, apply_key, dedupe_key FROM external_jobs")).mappings().all()

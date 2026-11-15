@@ -1,0 +1,5 @@
+# Only for a machine that runs the Google Jobs scraper (GOOGLE_JOBS_SCRAPER=1). Not needed on Render.
+#   pip install -r requirements-scraper.txt
+#   playwright install chromium
+-r requirements.txt
+playwright>=1.45

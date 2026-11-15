@@ -81,7 +81,7 @@ def _reason(error: str | None) -> str:
 def _rapidapi(db: Session, start, prev_start, buckets: int, step: int, tz: int, range_: str) -> dict:
     """The outside job feed (Indeed through RapidAPI): one row per request that left the server. Cache hits are not requests."""
     every = db.execute(select(ExternalCall.ok, ExternalCall.error, ExternalCall.latency_ms, ExternalCall.results, ExternalCall.created_at)
-                       .where(ExternalCall.created_at >= prev_start).order_by(ExternalCall.created_at.desc())).all()
+                       .where(ExternalCall.provider == "indeed", ExternalCall.created_at >= prev_start).order_by(ExternalCall.created_at.desc())).all()
     rows = [r for r in every if aware(r.created_at) >= start]
     ok = sum(1 for r in rows if r.ok)
     lat = [r.latency_ms for r in rows if r.latency_ms is not None]

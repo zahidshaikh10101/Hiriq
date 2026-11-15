@@ -228,7 +228,7 @@ class Application(Base):
 
 
 class ExternalJob(Base):
-    """A job post fetched from an outside feed (Indeed through the Jobs API), kept so Hiriq builds its own library of the market.
+    """A job post fetched from an outside source (Google Jobs scraping, or Indeed through the Jobs API), kept so Hiriq builds its own library of the market.
     Public job text only: nothing about any candidate is stored here, and no score either (scores are worked out per candidate
     when asked). One row per post: fetching the same post again only refreshes the text and `last_seen_at`.
     `read` is what the rules reader found in the text (skills, years, degree), so market questions need no re-reading."""
@@ -256,6 +256,12 @@ class ExternalJob(Base):
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     read: Mapped[dict] = mapped_column(Json, nullable=False, default=dict)
     last_query: Mapped[str | None] = mapped_column(String(100))
+    # What the source itself says, never guessed: "Full–time", "₹6–9 lakh a year", the site Google found it on ("LinkedIn"),
+    # and every apply link it offered ([{"site", "url", "direct"}], the first is apply_url).
+    employment_type: Mapped[str | None] = mapped_column(String(40))
+    salary_text: Mapped[str | None] = mapped_column(String(80))
+    source_site: Mapped[str | None] = mapped_column(String(80))
+    apply_links: Mapped[list] = mapped_column(Json, nullable=False, default=list)
     # sha-256 of the normalized apply link, and of title + company + city (see app/services/jobkeys.py)
     apply_key: Mapped[str | None] = mapped_column(String(64))
     dedupe_key: Mapped[str | None] = mapped_column(String(64))
@@ -343,7 +349,8 @@ class AiCall(Base):
 
 
 class ExternalCall(Base):
-    """One request to the outside job feed (RapidAPI). Powers the RapidAPI panel in admin; no search text or results are stored."""
+    """One request to an outside job source: provider "indeed" (RapidAPI, counts toward its monthly plan) or "google_jobs"
+    (one Google search by the scraper). Powers the admin usage panels; no search text or results are stored."""
 
     __tablename__ = "external_calls"
     __table_args__ = (Index("ix_external_calls_created", "created_at"),)

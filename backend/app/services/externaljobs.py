@@ -62,7 +62,8 @@ def _monthly_cap() -> int:
 
 
 def used_this_month() -> int:
-    """Requests sent to the feed this calendar month (UTC), counted from the log so a restart cannot reset it."""
+    """Requests sent to RapidAPI this calendar month (UTC), counted from the log so a restart cannot reset it.
+    Google Jobs searches are logged in the same table under their own provider and do not count here."""
     if db_session.SessionLocal is None:
         return 0
     try:
@@ -73,7 +74,7 @@ def used_this_month() -> int:
         now = datetime.now(timezone.utc)
         start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
         with db_session.SessionLocal() as db:
-            return int(db.scalar(select(func.count()).select_from(ExternalCall).where(ExternalCall.created_at >= start)) or 0)
+            return int(db.scalar(select(func.count()).select_from(ExternalCall).where(ExternalCall.provider == "indeed", ExternalCall.created_at >= start)) or 0)
     except Exception:  # noqa: BLE001
         return 0
 

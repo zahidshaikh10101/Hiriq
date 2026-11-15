@@ -2,20 +2,20 @@
 
 A preference list is "what I'd like, in order"; an empty list means no preference. Everything typed is untrusted text: it is
 trimmed, limited and de-duplicated here, and later sent to the job feed only as a search word, never run.
-The first fetch is kept deliberately small: the outside feed has a small monthly allowance for the whole server, so a save
-makes at most EXTERNAL_SAVE_FETCH_CALLS searches (default 2, one page each) and only when the roles or places changed.
+The first fetch is kept deliberately small and runs only when the roles or places changed: each source makes at most its
+own number of searches per save (Indeed: EXTERNAL_SAVE_FETCH_CALLS, default 2, because RapidAPI allows 250 a month for the
+whole server; Google Jobs: GOOGLE_JOBS_SAVE_QUERIES, default 4). The sources are in app/services/sources/.
 """
 from __future__ import annotations
 
-import os
 import re
 import uuid
 
 from sqlalchemy import select
 
 from app.db import session as db_session
-from app.db.recruiter_models import PREF_JOB_TYPES, PREF_MAX, PREF_WORK_MODES, CandidatePreference
-from app.services import externaljobs, externalstore
+from app.db.recruiter_models import PREF_JOB_TYPES, PREF_MAX, PREF_WORK_MODES, Candidate, CandidatePreference
+from app.services import externaljobs, externalstore, sources
 
 _TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .,'&()/+#-]{1,79}$")
 _SPACES = re.compile(r"\s+")
@@ -65,7 +65,7 @@ def view(p: CandidatePreference | None) -> dict:
         "job_types": list(p.job_types or []) if p else [], "work_modes": list(p.work_modes or []) if p else [],
         "last_refreshed_at": p.last_refreshed_at.isoformat() if p and p.last_refreshed_at else None,
         "limits": dict(PREF_MAX), "options": {"job_types": list(PREF_JOB_TYPES), "work_modes": list(PREF_WORK_MODES)},
-        "feed_on": externaljobs.configured(),
+        "feed_on": sources.any_configured(),
     }
 
 
@@ -74,23 +74,12 @@ def search_key(roles: list[str], locations: list[str]) -> tuple:
     return (tuple(r.lower() for r in roles), tuple(l.lower() for l in locations))
 
 
-def _calls_per_save() -> int:
-    try:
-        return max(0, min(int(os.getenv("EXTERNAL_SAVE_FETCH_CALLS", "2")), 5))
-    except ValueError:
-        return 2
-
-
-def queries(roles: list[str], locations: list[str], limit: int) -> list[tuple[str, str]]:
-    """The first few (role, place) searches. Each role is tried before a role is repeated in another place."""
-    places = locations or [""]
-    return [(r, l) for l in places for r in roles][:limit]
-
-
 def fetch_for(candidate_id: uuid.UUID) -> int:
-    """Background job after a save: fetch a few pages of outside jobs for this candidate's roles and keep them in the database.
-    Returns how many posts were kept. Never raises: a failed fetch must not matter to the person who just saved."""
-    if db_session.SessionLocal is None or not externaljobs.configured():
+    """Background job after a save: run each set-up source (sources.enabled(), Google Jobs first, then Indeed) for this
+    candidate's roles and places, and keep what they find in external_jobs. Google is also given the resume's years of
+    experience (floor and ceil). Returns how many posts were kept. Never raises: a failed fetch must not matter to the
+    person who just saved."""
+    if db_session.SessionLocal is None or not sources.any_configured():
         return 0
     kept = 0
     try:
@@ -98,15 +87,21 @@ def fetch_for(candidate_id: uuid.UUID) -> int:
             p = db.scalars(select(CandidatePreference).where(CandidatePreference.candidate_id == candidate_id)).first()
             if p is None or not p.roles:
                 return 0
-            for role, place in queries(list(p.roles), list(p.locations or []), _calls_per_save()):
+            c = db.get(Candidate, candidate_id)
+            years = c.total_experience_years if c is not None else None
+            roles, places = list(p.roles), list(p.locations or [])
+            for src in sources.enabled():
+                plan = src.plan(roles, places, years, src.calls_per_save())
                 try:
-                    found = externaljobs.search(role, place)
-                except externaljobs.ExternalError as exc:
-                    if exc.code in ("feed_busy", "not_configured", "monthly_limit"):
-                        break
-                    continue
-                kept += len(externalstore.save(db, [dict(j) for j in found["jobs"]], role, externaljobs.country()))
-                db.commit()
+                    for res in src.run(plan):
+                        if res.error is not None:
+                            if res.error.stop:
+                                break
+                            continue
+                        kept += len(externalstore.save(db, res.jobs, res.search.label, externaljobs.country(), provider=src.provider))
+                        db.commit()
+                except Exception:  # noqa: BLE001  (one source failing never stops the next)
+                    db.rollback()
     except Exception:  # noqa: BLE001
         return kept
     return kept

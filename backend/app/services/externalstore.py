@@ -35,7 +35,7 @@ def _find_same(db: Session, provider: str, external_id: str, akey: str | None, d
     return row
 
 
-def save(db: Session, jobs: list[dict], query: str, country: str) -> dict[str, ExternalJob]:
+def save(db: Session, jobs: list[dict], query: str, country: str, provider: str = PROVIDER) -> dict[str, ExternalJob]:
     """Insert new posts and refresh known ones. Returns {provider id: row} for what could be saved.
     A post that is already in the library under another id or site (same apply link, or same title, company and city) refreshes
     that row instead of adding a second one, and is returned under its own provider id."""
@@ -48,13 +48,18 @@ def save(db: Session, jobs: list[dict], query: str, country: str) -> dict[str, E
         for j in jobs:
             akey = jobkeys.apply_key(j["apply_url"])
             dkey = jobkeys.dedupe_key(j["title"], j["company"], j["location"])
-            row = _find_same(db, PROVIDER, j["id"], akey, dkey, seen)
+            row = _find_same(db, provider, j["id"], akey, dkey, seen)
             if row is None:
-                row = ExternalJob(provider=PROVIDER, external_id=j["id"], first_seen_at=now, listed_at=now)
+                row = ExternalJob(provider=provider, external_id=j["id"], first_seen_at=now, listed_at=now)
                 db.add(row)
             row.title, row.company, row.location, row.country = j["title"], j["company"], j["location"], (country or None)
             row.remote, row.apply_url, row.description = bool(j["remote"]), j["apply_url"], j["description"]
             row.posted_at, row.last_query, row.last_seen_at = _when(j["posted_at"]), query[:100], now
+            # what the source says about the post (Google gives these; Indeed does not). Never wipe a value we already have.
+            row.employment_type = (j.get("employment_type") or "")[:40] or row.employment_type
+            row.salary_text = (j.get("salary") or "")[:80] or row.salary_text
+            row.source_site = (j.get("via") or "")[:80] or row.source_site
+            row.apply_links = list(j.get("apply_links") or []) or list(row.apply_links or [])
             if row.posted_at:
                 row.listed_at = row.posted_at
             # keep the key a row already has when this copy has no link (never replace a good key with nothing)

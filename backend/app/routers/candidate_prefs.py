@@ -17,7 +17,7 @@ from app.db.models import User
 from app.db.recruiter_models import PREF_JOB_TYPES, PREF_MAX, PREF_WORK_MODES, CandidatePreference
 from app.db.session import get_db
 from app.routers.candidate import _db, _ensure
-from app.services import externaljobs, prefs
+from app.services import prefs, sources
 
 router = APIRouter(tags=["candidate-preferences"])
 
@@ -75,7 +75,7 @@ def save_preferences(body: PrefsBody, background: BackgroundTasks, actor: User =
     db.commit()
     db.refresh(row)
     changed = prefs.search_key(body.roles, body.locations) != before
-    fetching = bool(changed and body.roles and externaljobs.configured())
+    fetching = bool(changed and body.roles and sources.any_configured())
     if fetching:
         background.add_task(prefs.fetch_for, c.id)
     out = prefs.view(row)
