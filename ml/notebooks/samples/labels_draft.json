@@ -1,0 +1,50 @@
+[
+  {
+    "key": "Senior Data Analyst - AI & Automation | QualityAI",
+    "checked": false,
+    "skills": [
+      "sql",
+      "python",
+      "etl",
+      "llm",
+      "looker studio",
+      "tableau",
+      "power bi",
+      "javascript",
+      "google apps script",
+      "google sheets",
+      "google slides",
+      "google workspace",
+      "powerpoint",
+      "gemini",
+      "model context protocol",
+      "data governance",
+      "data validation",
+      "data visualization"
+    ],
+    "experience_min": 5,
+    "experience_max": 8,
+    "qualification_level": null,
+    "description": "About the RoleWe are looking for an innovative Data Analyst with AI Experience to bridge traditional data analysis with modern AI-driven automation. You will manage large datasets, build insightful dashboards, and leverage cutting-edge AI and scripting tools to fundamentally transform how data workflows operate within a Google-integrated ecosystem.Key ResponsibilitiesData Analysis & Dashboards: Process complex datasets using SQL, Python, and Google Sheets, and build interactive reports using Tableau, Power BI, or Looker Studio.AI-First Automation & MCP Integration: Design and deploy Model Context Protocol (MCP) standards and LLM integrations to allow AI agents to safely connect with enterprise data sources and execute multi-step workflows.Advanced Scripting: Build robust data pipelines and complex automations using Python, and streamline day-to-day operations using JavaScript and Google Apps Script across Google Workspace.ETL & Data Governance: Manage basic ETL frameworks, data validation, reconciliation, and consistency across platforms.Stakeholder Collaboration: Translate complex technical findings into clear insights using Google Slides or PowerPoint for cross-functional teams.Candidate RequirementsCore Technical SkillsExperience: 5 to 8+ years of professional experience in a data analysis, business intelligence, or data-driven role.Programming & Databases: Solid foundation in Python and SQL / Google SQL for data extraction, manipulation, and pipeline creation.Google Ecosystem & AI Tooling: Hands-on experience with Google Sheets, Looker Studio, Gemini models, and LLM APIs, alongside workflow automation via JavaScript / Google Apps Script.Modern Frameworks: Familiarity with Model Context Protocol (MCP) standards for dynamic context sharing and tool orchestration.BI & Visualization: Expertise in data visualization platforms like Tableau, Power BI, or Looker Studio.Soft Skills & MindsetAnalytical Thinking: Naturally curious with high attention to detail and a passion for independent problem-solving.Communication: Excellent verbal and written communication skills to convey findings effectively to technical and non-technical stakeholders."
+  },
+  {
+    "key": "Senior Analyst, Digital Analytics | Labcorp",
+    "checked": false,
+    "skills": [
+      "adobe customer journey analytics",
+      "adobe journey optimizer",
+      "marketo",
+      "power bi",
+      "powerpoint",
+      "website analytics",
+      "digital marketing",
+      "customer journeys",
+      "data storytelling",
+      "segmentation"
+    ],
+    "experience_min": 4,
+    "experience_max": 6,
+    "qualification_level": null,
+    "description": "Labcorp is seeking a Senior Analyst – Digital Analytics to join our team at LabCorp Bangalore\nWork Schedule\nThe Senior Associate, Website and Campaign Performance Reporting will be responsible for delivering website, campaign, and marketing performance reporting and insights using Adobe Customer Journey Analytics (CJA) and external marketing data sources. The role will focus on data analysis, reporting automation, data storytelling, and presenting actionable insights to marketing stakeholders.\nJob Responsibilities\n• Own and deliver website performance reporting using Adobe Customer Journey Analytics (CJA).\n• Analyze website traffic, user behavior, engagement, conversion trends, and customer journeys and translate data into actionable insights.\n• Develop and maintain campaign and marketing performance reporting, including channel, campaign, and marketing performance analysis.\n• Be well versed in reporting and analyzing campaign and marketing data imported from external data sources, such as Marketo, Adobe Journey Optimizer (AJO), and other marketing platforms.\n• Build and maintain CJA segments, calculated/custom fields, metrics, dimensions, and reporting components to support business and marketing requirements.\n• Automate CJA reporting and dashboards using Power BI, reducing manual reporting effort and improving reporting efficiency.\n• Identify trends, opportunities, anomalies, and performance drivers in digital and marketing data and proactively communicate key findings to stakeholders.\n• Develop executive-ready PowerPoint presentations and dashboards that clearly communicate performance, insights, and recommendations.\n• Demonstrate strong data storytelling skills, turning complex analytics into simple, clear, and business-focused narratives.\n• Present insights and recommendations confidently to marketing, business, and leadership teams.\n• Partner with marketing, implementation, and analytics teams to understand reporting requirements and deliver scalable and effective analytics solutions.\n• Continuously identify opportunities to improve reporting processes, automation, data quality, and the overall effectiveness of digital analytics reporting.\nMinimum Qualifications\n• 4–6 years of hands-on working experience with Adobe Customer Journey Analytics (CJA), particularly in website analytics and reporting.\n• Strong hands-on experience with Adobe CJA, including workspace reporting, analysis, segmentation, calculated/custom fields, and reporting components.\n• Good understanding of digital marketing, website traffic, campaigns, channels, customer journeys, engagement, and conversion metrics.\n• Experience working with and reporting on campaign and marketing data from external platforms, such as Marketo, Adobe Journey Optimizer (AJO), and similar marketing technologies.\n• Experience with Power BI and reporting automation, with the ability to develop automated and scalable reporting solutions.\n• Strong analytical and problem-solving skills, with the ability to identify the “why” behind the numbers and translate findings into actionable recommendations.\n• Excellent data storytelling and presentation skills.\n• Strong proficiency in PowerPoint, with the ability to create clear, visually compelling, and executive-ready presentations.\n• Comfortable presenting analytics, insights, and recommendations directly to marketing and business stakeholders.\n• Strong communication and stakeholder management skills, with the ability to explain complex analytics concepts to non-technical audiences.\n• Ability to work independently, manage multiple reporting requirements, prioritize competing requests, and deliver high-quality outputs within timelines.\n• A strong business mindset with the ability to connect digital performance data with marketing objectives and business outcomes.\nPreferred Qualifications\nAdobe CJA certification\nLabcorp is proud to be an Equal Opportunity Employer:\nLabcorp strives for inclusion and belonging in the workforce and does not tolerate harassment or discrimination of any kind. We make employment decisions based on the needs of our business and the qualifications and merit of the individual. Qualified applicants will receive consideration for employment without regard to race, religion, color, national origin, sex (including pregnancy, childbirth, or related medical conditions), family or parental status, marital, civil union or domestic partnership status, sexual orientation, gender identity, gender expression, personal appearance, age, veteran status, disability, genetic information, or any other legally protected characteristic. Additionally, all qualified applicants with arrest or conviction records will be considered for employment in accordance with applicable law.\nWe encourage all to apply\nIf you are an individual with a disability who needs assistance using our online tools to search and apply for jobs, or needs an accommodation, please visit our accessibility site or contact us at Labcorp Accessibility. For more information about how we collect and store your personal data, please see our Privacy Statement."
+  }
+]

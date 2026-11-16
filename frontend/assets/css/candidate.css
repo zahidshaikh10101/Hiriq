@@ -77,8 +77,7 @@
 .score-pair .mono { font-size: 22px; }
 .resume-edit { width: 100%; min-height: 360px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.55; resize: vertical; }
 
-/* ---------- recommended and outside search ---------- */
-.rec-why { margin: 0; font-size: 13.5px; color: rgb(var(--ink) / 0.75); }
+/* ---------- outside search ---------- */
 .ext-card { display: grid; gap: 10px; }
 .ext-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .ext-desc { font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: rgb(var(--ink) / 0.75); max-height: 220px; overflow: auto; }

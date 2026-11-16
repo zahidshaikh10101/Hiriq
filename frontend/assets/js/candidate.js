@@ -1,5 +1,5 @@
 /* Hiriq — candidate workspace. Live data from the backend (/api/candidate/*).
-   Views are chosen by the URL hash: #profile #insights #jobs #jobs/<id>.
+   Views are chosen by the URL hash: #profile (insights are part of it) #jobs #jobs/<id> #search #applications #resume #letters #prep.
    Profile (resume upload, edit, who can see you), Insights (what your resume shows and what open jobs ask for) and
    Jobs & match (open jobs, your fit with the reasons, a match for any job description you paste, and Apply) are live.
    Apply and the Applications page are in candidate-apply.js.
@@ -120,8 +120,12 @@
       '<button type="button" role="switch" class="switch" id="vis" aria-checked="' + !!me.visible_to_recruiters + '" aria-label="Visible to recruiters"' + (canShow ? "" : " disabled") + "></button></div>" +
       (canShow ? "" : '<p class="privacy-note">Add your resume or some skills first. Then you can choose to be found.</p>') + "</div>" +
       '<div class="card card-stack" id="profile-card"><div class="row-between"><h2 class="card-title">Profile details</h2><button type="button" class="btn-link" id="btn-edit">Edit</button></div>' + profileSummary(me) + "</div>" +
+      '<div id="insights-slot" class="insights-slot"><div class="card loading" role="status">Loading insights…</div></div>' +
+      '<div id="prefs-card"></div>' +
       '<p class="privacy-note">Your name, gender, photo, college and age are never used to score you. Nothing here contacts a recruiter for you.</p></div>';
 
+    loadInsights($("#insights-slot"), navId);
+    if (window.HiriqPrefs) window.HiriqPrefs.mount($("#prefs-card"), { api: api, esc: esc, explain: explain });
     var input = $("#file-input"), dzEl = $("#dz");
     $("#pick").addEventListener("click", function () { input.click(); });
     input.addEventListener("change", function () { if (input.files[0]) upload(input.files[0]); input.value = ""; });
@@ -218,19 +222,16 @@
     related: ["Related tool, half credit", "near"], ai_related: ["Related tool, half credit", "near"], missing: ["Not found", "miss"]
   };
 
-  function renderInsights() {
-    var mine = ++navId;
-    loading("Insights");
+  // The insights sit on My profile, under the profile details; they load by themselves after the page is drawn.
+  function loadInsights(slot, mine) {
     api("GET", "/api/candidate/insights").then(function (r) {
-      if (mine !== navId) return;
-      if (!r.ok) { failure("Insights", r.error); return; }
-      drawInsights(r.data);
+      if (mine !== navId || !document.body.contains(slot)) return;
+      slot.innerHTML = r.ok && r.data && r.data.completeness ? insightsHtml(r.data) : notice("error", r.error || "Insights could not be loaded.");
     });
   }
 
-  function drawInsights(D) {
+  function insightsHtml(D) {
     var c = D.completeness;
-    var empty = D.has_profile ? "" : notice("info", "Upload your resume or add some skills on My profile and these insights fill in.");
     var done = '<div class="card card-stack"><div class="row-between"><div class="stack-2"><h2 class="card-title">Profile completeness</h2><span class="card-sub">How much of your profile is filled in. This describes your profile, not you.</span></div>' +
       '<span class="mono" style="font-size:22px">' + c.percent + '%</span></div><div class="progress" role="img" aria-label="' + c.percent + ' percent complete"><span style="width:' + c.percent + '%"></span></div>' +
       '<ul class="checklist">' + c.items.map(function (i) {
@@ -240,20 +241,24 @@
     var sk = D.skills, skillsHtml;
     if (!sk.count) skillsHtml = '<p class="empty-inline">No skills on file yet.</p>';
     else {
-      skillsHtml = '<span class="card-sub">' + sk.shown + " shown in your work, " + sk.listed_only + " only listed in a skills line. Skills you can point to in a project or job are the strongest.</span>" +
-        '<div class="chips-row">' + sk.by_category.map(function (g) { return '<span class="chip chip-violet">' + esc(g.category) + " · " + g.count + "</span>"; }).join(" ") + "</div>" +
-        '<ul class="skill-rows">' + sk.items.map(function (s) {
-          return '<li class="skill-row"><span class="skill-main"><strong>' + esc(s.skill) + "</strong><small class=\"faint\">" + esc(s.category) + "</small>" +
-            (s.evidence && s.state === "shown" ? "<blockquote>" + esc(s.evidence) + "</blockquote>" : "") + '</span><span class="status-chip ' + (STATE_CLASS[s.state] || "") + '">' + esc(STATE_TEXT[s.state] || s.state) + "</span></li>";
-        }).join("") + "</ul>";
+      var groups = {}, order = [];
+      sk.items.forEach(function (i) { var k = i.category || "Other"; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(i.skill); });
+      skillsHtml = '<div class="skill-groups">' + order.map(function (k) {
+        return '<div class="skill-group"><span class="skill-cat">' + esc(k) + ' <small>' + groups[k].length + '</small></span><div class="chips-row">' +
+          groups[k].map(function (n) { return '<span class="chip chip-neutral">' + esc(n) + "</span>"; }).join("") + "</div></div>";
+      }).join("") + "</div>";
     }
 
     var ex = D.experience;
+    function job(e) {
+      return '<li class="exp-row"><strong>' + esc(e.title || "Role") + "</strong><span>" + esc(e.company) + "</span><small>" +
+        esc([e.start, e.end || (e.start ? "present" : "")].filter(Boolean).join(" – ")) + "</small></li>";
+    }
     var expHtml = '<div class="chips-row"><span class="chip chip-cyan">' + years(ex.years) + ' of experience</span>' +
-      (ex.basis === "dates" ? '<span class="chip chip-neutral">counted from your job dates</span>' : ex.basis === "edited" ? '<span class="chip chip-neutral">entered by you</span>' : "") + "</div>" +
-      (ex.employers.length ? ex.employers.map(function (e) {
-        return '<div class="employer"><strong>' + esc(e.title || "Role") + "</strong> at " + esc(e.company) + "<br><small>" + esc([e.start, e.end || (e.start ? "present" : "")].filter(Boolean).join(" – ")) + "</small></div>";
-      }).join("") : '<p class="empty-inline">No work history on file.</p>');
+      (ex.basis === "dates" ? '<span class="chip chip-neutral">from your job dates</span>' : ex.basis === "edited" ? '<span class="chip chip-neutral">entered by you</span>' : "") + "</div>" +
+      (ex.employers.length ? '<ul class="exp-list">' + ex.employers.slice(0, 3).map(job).join("") + "</ul>" +
+        (ex.employers.length > 3 ? '<details class="exp-more"><summary>Show ' + (ex.employers.length - 3) + " more</summary><ul class=\"exp-list\">" + ex.employers.slice(3).map(job).join("") + "</ul></details>" : "")
+        : '<p class="empty-inline">No work history on file.</p>');
 
     var mk = D.market, marketHtml;
     if (!mk.open_jobs) marketHtml = '<p class="empty-inline">No open jobs on Hiriq yet, so there is nothing to compare with.</p>';
@@ -269,11 +274,11 @@
         '<a class="btn-link" href="#jobs">See the jobs and score your fit</a>';
     }
 
-    view.innerHTML = '<div class="view">' + header("Insights", LIVE) + empty + done +
+    return done +
       '<div class="row"><div class="card card-stack grow-2"><h2 class="card-title">Your skills</h2>' + skillsHtml + "</div>" +
       '<div class="card card-stack grow-1"><h2 class="card-title">Experience</h2>' + expHtml + "</div></div>" +
       '<div class="card card-stack"><h2 class="card-title">Skills in demand</h2>' + marketHtml + "</div>" +
-      '<p class="privacy-note">Never used to score you: ' + esc(D.not_scored.join(", ")) + ".</p></div>";
+      '<p class="privacy-note">Never used to score you: ' + esc(D.not_scored.join(", ")) + ".</p>";
   }
 
   // =====================================================
@@ -529,53 +534,9 @@
 
 
   // =====================================================
-  // RECOMMENDED (open Hiriq jobs, best fit first)
-  // =====================================================
-  var recMin = "30", recMode = "";
-
-  function renderRecommended() {
-    var mine = ++navId;
-    loading("Recommended");
-    var qs = "?min_score=" + encodeURIComponent(recMin) + (recMode ? "&work_mode=" + encodeURIComponent(recMode) : "");
-    api("GET", "/api/candidate/recommendations" + qs).then(function (r) {
-      if (mine !== navId) return;
-      if (r.status === 409) {
-        view.innerHTML = '<div class="view">' + header("Recommended", LIVE) + notice("info", "Add your resume or some skills on My profile first, then we can suggest jobs.") + '<p><a class="btn btn-grad" href="#profile">Go to My profile</a></p></div>';
-        return;
-      }
-      if (!r.ok) { failure("Recommended", r.error); return; }
-      drawRecommended(r.data);
-    });
-  }
-
-  function recCard(j) {
-    var f = j.fit;
-    return '<article class="card job-card"><div class="stack-2" style="flex:1;min-width:240px"><h3><a href="#jobs/' + esc(j.id) + '">' + esc(j.title) + '</a></h3><div class="job-meta">' + jobMeta(j) + "</div>" +
-      '<p class="rec-why">' + esc(j.reason) + "</p>" +
-      (j.matched.length ? '<div class="chips-row"><small class="faint">You have</small> ' + chips(j.matched, 6, "chip-cyan") + "</div>" : "") +
-      (j.gaps.length ? '<div class="chips-row"><small class="faint">To build</small> ' + chips(j.gaps, 4, "chip-neutral") + "</div>" : "") + "</div>" +
-      '<div class="fit-side"><span class="score-chip' + (f.score >= 70 ? " strong" : "") + '">' + f.score + '</span><small class="faint">of 100</small>' +
-      '<a class="btn btn-outline" href="#jobs/' + esc(j.id) + '" style="min-height:38px">See why</a></div></article>';
-  }
-
-  function drawRecommended(D) {
-    var list = D.recommended.length ? '<div class="job-list">' + D.recommended.map(recCard).join("") + "</div>"
-      : '<div class="card"><p class="empty-inline">' + (D.considered ? "No open jobs reach that fit yet. Lower the minimum fit, or add skills on My profile." : "No open jobs with listed skills yet. Check back soon, or search outside jobs.") + "</p></div>";
-    view.innerHTML = '<div class="view">' + header("Recommended", LIVE) +
-      '<div class="toolbar"><label class="faint" style="font-size:13px" for="r-min">Show fit of at least</label><select class="field field-sm" id="r-min" style="max-width:110px">' +
-      ["0", "30", "50", "70"].map(function (v) { return '<option value="' + v + '"' + (String(D.min_score) === v ? " selected" : "") + ">" + v + "</option>"; }).join("") + "</select>" +
-      '<select class="field field-sm" id="r-mode" style="max-width:150px" aria-label="Work mode"><option value="">Any work mode</option>' +
-      ["onsite", "hybrid", "remote"].map(function (v) { return '<option value="' + v + '"' + (recMode === v ? " selected" : "") + ">" + v + "</option>"; }).join("") + "</select>" +
-      '<span class="faint" style="font-size:13px">' + D.considered + " open jobs checked · " + D.strong + " strong" + (D.hidden_below ? " · " + D.hidden_below + " below your minimum" : "") + "</span></div>" + list +
-      '<p class="privacy-note">Ranked by skills, qualification and experience from your resume. Where you live and your name are not scored.</p></div>';
-    $("#r-min").addEventListener("change", function () { recMin = this.value; renderRecommended(); });
-    $("#r-mode").addEventListener("change", function () { recMode = this.value; renderRecommended(); });
-  }
-
-  // =====================================================
   // SEARCH OUTSIDE JOBS
   // =====================================================
-  var extState = { q: "", loc: "", result: null };
+  var extState = { q: "", loc: "", radius: 20, page: 1, result: null };
 
   function renderSearch() {
     var mine = ++navId;
@@ -588,49 +549,89 @@
     });
   }
 
-  function extCard(j, i, me) {
-    var tooShort = (j.description || "").length < 200;
-    return '<article class="card ext-card" data-i="' + i + '"><div class="stack-2"><h3 style="margin:0">' + esc(j.title) + '</h3><div class="job-meta">' +
-      [j.company, j.location, j.remote ? "remote" : "", j.employment_type, j.source ? "via " + j.source : "", j.posted_at ? "posted " + ago(j.posted_at) : ""].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div></div>" +
-      (me.skills && me.skills.length ? '<div class="chips-row"><small class="faint">Your skills in this post</small> ' + (j.skills_in_posting.length ? chips(j.skills_in_posting, 12, "chip-cyan") : '<span class="faint">none found</span>') + "</div>" : "") +
+  function matchBadge(j, res) {
+    var m = j.match;
+    if (m) {
+      var tone = m.score >= 70 ? "match-high" : m.score >= 40 ? "match-mid" : "match-low";
+      return '<span class="match-pill ' + tone + '" title="Estimated from the words of the post by rules, not read by AI. Press Detailed analysis to see how.">' + m.score + '% match<small>estimated</small></span>';
+    }
+    return '<span class="match-pill match-none" title="">' + (res.can_score ? "No estimate" : "Add your resume to see your match") + "</span>";
+  }
+
+  function extCard(j, i, me, res) {
+    var tooShort = (j.description || "").length < 200, m = j.match;
+    var lines = "";
+    if (m) {
+      lines = '<div class="chips-row"><small class="faint">You show</small> ' + (m.matched.length ? chips(m.matched, 8, "chip-cyan") : '<span class="faint">none of its skills</span>') + "</div>" +
+        (m.missing.length ? '<div class="chips-row"><small class="faint">Missing</small> ' + chips(m.missing, 5, "") + "</div>" : "");
+    } else if (res.can_score) {
+      lines = '<small class="faint">This post names no skill Hiriq recognises, so there is no honest number. Open it to read it yourself.</small>';
+    }
+    return '<article class="card ext-card" data-i="' + i + '"><div class="row-between"><div class="stack-2"><h3 style="margin:0">' + esc(j.title) + '</h3><div class="job-meta">' +
+      [j.company, j.location, j.remote ? "remote" : "", j.source ? "via " + j.source : "", j.posted_at ? "posted " + ago(j.posted_at) : ""].filter(Boolean).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div></div>" +
+      matchBadge(j, res) + "</div>" + lines +
       (j.description ? '<details><summary class="card-sub" style="cursor:pointer">Read the description</summary><div class="ext-desc">' + esc(j.description) + "</div></details>" : "") +
       '<div class="ext-actions">' + (j.apply_url ? '<a class="btn btn-outline" href="' + esc(j.apply_url) + '" target="_blank" rel="noopener noreferrer">Open the posting</a>' : "") +
-      '<button type="button" class="btn btn-grad" data-act="fit"' + (tooShort || !me.has_profile ? " disabled" : "") + '>Check my fit</button>' +
+      '<button type="button" class="btn btn-grad" data-act="detail"' + (m && j.job_ref ? "" : " disabled") + ">Detailed analysis</button>" +
+      '<button type="button" class="btn btn-outline" data-act="fit"' + (tooShort || !me.has_profile ? " disabled" : "") + ">Check with AI</button>" +
       '<button type="button" class="btn btn-outline" data-act="tailor"' + (tooShort || !me.has_resume ? " disabled" : "") + ">Tailor my resume</button></div>" +
-      (tooShort ? '<small class="faint">This post is too short to check. Open it and paste the full text in Jobs &amp; match.</small>' : "") + '<div class="card-stack" data-out aria-live="polite"></div></article>';
+      (tooShort ? '<small class="faint">This post is too short for the AI check. Open it and paste the full text in Jobs &amp; match.</small>' : "") + '<div class="card-stack" data-out aria-live="polite"></div></article>';
+  }
+
+  function runSearch(me, page) {
+    $("#s-go").disabled = true;
+    $("#msg").innerHTML = notice("info", "Searching…");
+    api("GET", "/api/candidate/external?q=" + encodeURIComponent(extState.q) + (extState.loc ? "&location=" + encodeURIComponent(extState.loc) : "") +
+      "&radius=" + extState.radius + "&page=" + page).then(function (r) {
+      if (!r.ok) { $("#s-go").disabled = false; $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+      extState.result = r.data; extState.page = page; drawSearch(true, me);
+    });
   }
 
   function drawSearch(configured, me) {
     if (!configured) {
-      view.innerHTML = '<div class="view">' + header("Search outside jobs", LIVE) + notice("info", "The outside job feed is not switched on for this server yet. The person running Hiriq adds a JSearch key (RAPIDAPI_KEY) to turn it on. Until then, use Recommended and Jobs & match.") + "</div>";
+      view.innerHTML = '<div class="view">' + header("Search outside jobs", LIVE) + notice("info", "The outside job feed is not switched on for this server yet. The person running Hiriq adds a Jobs API key (RAPIDAPI_KEY) to turn it on. Until then, use Jobs & match.") + "</div>";
       return;
     }
     var res = extState.result;
-    var list = !res ? "" : res.jobs.length ? '<div class="job-list">' + res.jobs.map(function (j, i) { return extCard(j, i, me); }).join("") + "</div>"
+    var pager = res && res.jobs.length ? '<div class="actions-bar"><button type="button" class="btn btn-outline" id="s-prev"' + (extState.page <= 1 ? " disabled" : "") + '>Previous page</button><span class="faint" style="font-size:13px">Page ' + extState.page +
+      ' · best estimated match first on each page</span><button type="button" class="btn btn-outline" id="s-next"' + (extState.page >= 5 || !res.has_more ? " disabled" : "") + ">Next page</button></div>" : "";
+    var list = !res ? "" : res.jobs.length ? '<div class="job-list">' + res.jobs.map(function (j, i) { return extCard(j, i, me, res); }).join("") + "</div>" + pager
       : '<div class="card"><p class="empty-inline">Nothing found for that search. Try a broader title.</p></div>';
+    var radii = [10, 20, 50, 100].map(function (n) { return '<option value="' + n + '"' + (n === extState.radius ? " selected" : "") + ">Within " + n + " km</option>"; }).join("");
     view.innerHTML = '<div class="view">' + header("Search outside jobs", LIVE) + '<div id="msg" aria-live="polite"></div>' +
       '<form class="toolbar" id="s-form"><input class="field field-sm" id="s-q" placeholder="Job title or skill, e.g. data analyst" maxlength="100" value="' + esc(extState.q) + '" aria-label="Job title or skill" required minlength="2">' +
       '<input class="field field-sm" id="s-loc" placeholder="City (optional)" maxlength="100" value="' + esc(extState.loc) + '" aria-label="City">' +
+      '<select class="field field-sm" id="s-rad" aria-label="Distance">' + radii + "</select>" +
       '<button type="submit" class="btn btn-grad" id="s-go">Search</button></form>' + list +
-      '<p class="privacy-note">These come from other job sites, so the text is theirs. There is no fit score until you press Check my fit, which reads the post with the AI and compares it to your resume.</p></div>';
+      '<p class="privacy-note">These come from other job sites, so the text is theirs. The percentage is an estimate: Hiriq reads the skills, years and degree the post mentions and scores them against your profile with the same rules as Hiriq jobs, so it can miss what a post leaves unsaid. Detailed analysis shows exactly how it was worked out. Your location only fills the search box; it is never scored.</p></div>';
     $("#s-form").addEventListener("submit", function (e) {
       e.preventDefault();
-      extState.q = $("#s-q").value.trim(); extState.loc = $("#s-loc").value.trim();
+      extState.q = $("#s-q").value.trim(); extState.loc = $("#s-loc").value.trim(); extState.radius = Number($("#s-rad").value) || 20;
       if (extState.q.length < 2) return;
-      $("#s-go").disabled = true;
-      $("#msg").innerHTML = notice("info", "Searching…");
-      api("GET", "/api/candidate/external?q=" + encodeURIComponent(extState.q) + (extState.loc ? "&location=" + encodeURIComponent(extState.loc) : "")).then(function (r) {
-        if (!r.ok) { $("#s-go").disabled = false; $("#msg").innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
-        extState.result = r.data; drawSearch(true, me);
-      });
+      runSearch(me, 1);
     });
+    if (res && res.jobs.length) {
+      $("#s-prev").addEventListener("click", function () { runSearch(me, extState.page - 1); });
+      $("#s-next").addEventListener("click", function () { runSearch(me, extState.page + 1); });
+    }
     view.querySelectorAll(".ext-card").forEach(function (card) {
       var job = res.jobs[Number(card.getAttribute("data-i"))], out = card.querySelector("[data-out]");
       card.addEventListener("click", function (e) {
         var act = e.target.getAttribute && e.target.getAttribute("data-act");
         if (!act) return;
         var btn = e.target; btn.disabled = true;
-        if (act === "fit") {
+        if (act === "detail") {
+          var dl = work(out, "detail", function () { btn.disabled = false; });
+          api("GET", "/api/candidate/external/jobs/" + encodeURIComponent(job.job_ref) + "/fit").then(function (r) {
+            if (dl.cancelled) return;
+            btn.disabled = false;
+            if (!r.ok) { out.innerHTML = notice("error", (r.data && r.data.detail && r.data.detail.message) || explain(r)); return; }
+            var d = r.data;
+            out.innerHTML = matchHtml({ score: d.score, parts: d.parts, explanation: d.explanation, summary: d.summary, assessed_weight: d.assessed_weight }) +
+              '<p class="privacy-note">' + esc(d.basis) + "</p>";
+          });
+        } else if (act === "fit") {
           var fl = work(out, "fit", function () { btn.disabled = false; });
           api("POST", "/api/candidate/match/paste", { text: job.description }).then(function (r) {
             if (fl.cancelled) return;
@@ -791,8 +792,7 @@
 
   var VIEWS = {
     profile: [function () { renderProfile(); }, "My profile"],
-    insights: [function () { renderInsights(); }, "Insights"],
-    recommended: [function () { renderRecommended(); }, "Recommended"],
+    insights: [function () { window.location.replace("#profile"); }, "My profile"],
     search: [function () { renderSearch(); }, "Search outside jobs"],
     prep: [function (rest) {
       rest[0] ? docDetail("Interview prep", "/api/candidate/preps/" + encodeURIComponent(decodeURIComponent(rest[0])), drawPrep)

@@ -1,6 +1,7 @@
 /* Hiriq — admin console. Live data from the backend (/api/admin/*).
    Views are chosen by the URL hash: #overview #users #ai #jobs #model #audit.
-   Overview, Users, AI usage and Audit read your real database. Jobs and Model quality have nothing to show yet. */
+   Overview, Users, AI usage, Jobs and Audit read and write your real database. Model quality has nothing to show yet.
+   Every section except Model quality has a "Download PDF" button (see admin-pdf.js). */
 (function () {
   var view = document.getElementById("view");
   var cfg = window.HIRIQ_CONFIG;
@@ -43,6 +44,19 @@
   function failure(title, message) {
     view.innerHTML = '<div class="view">' + header(title, "", null) +
       '<div class="notice notice-error" role="alert" style="animation:none">' + icon("info", 18) + "<span>" + esc(message) + "</span></div></div>";
+  }
+
+  // ---------- PDF download (each section hands over a spec; admin-pdf.js builds the file) ----------
+  function pdfBtn() {
+    return '<button type="button" class="btn btn-outline btn-pdf" data-pdf>' + icon("download", 16) + "Download PDF</button>";
+  }
+  function wirePdf(file, specFn) {
+    var b = view.querySelector("[data-pdf]");
+    if (!b) return;
+    b.addEventListener("click", function () {
+      try { window.HiriqPDF.download(file, specFn()); }
+      catch (e) { window.alert("Could not build the PDF: " + e.message); }
+    });
   }
 
   // ---------- dates (the server sends ISO times; we show them in the viewer's own time zone) ----------
@@ -167,7 +181,7 @@
 
     view.innerHTML =
       '<div class="view">' +
-      header("Overview", '<div class="range" role="group" aria-label="Date range">' + ranges + "</div>") +
+      header("Overview", '<div class="range" role="group" aria-label="Date range">' + ranges + "</div>" + pdfBtn()) +
       '<div class="grid-auto">' + kpis + "</div>" +
       '<div class="row">' +
         '<div class="glow-border grow-2" style="--r:22px"><div class="glow-inner card-stack" style="padding:22px">' +
@@ -187,6 +201,23 @@
       b.addEventListener("click", function () { overviewRange = b.getAttribute("data-range"); renderOverview(); });
     });
     wireBarChart("signups", up.values, up.labels, "Total for the period");
+    wirePdf("hiriq-overview-" + overviewRange + ".pdf", function () {
+      var span = { "7d": "Last 7 days", "30d": "Last 30 days", "90d": "Last 90 days" }[overviewRange];
+      return {
+        title: "Overview", subtitle: span,
+        blocks: [
+          { type: "kpis", items: D.kpis.map(function (k) { return [k.label, fmt(k.value), k.delta || ""]; }) },
+          { type: "heading", text: "New sign-ups (" + up.sub.toLowerCase() + ")" },
+          { type: "table", head: ["Period", "Sign-ups"], widths: [3, 1], align: ["l", "r"], rows: up.labels.map(function (l, i) { return [l, fmt(up.values[i])]; }) },
+          { type: "heading", text: "Users by role" },
+          { type: "table", head: ["Role", "Accounts"], widths: [3, 1], align: ["l", "r"], rows: D.roles.map(function (r) { return [r[0], fmt(r[1])]; }) },
+          { type: "heading", text: "System health" },
+          { type: "table", head: ["Check", "State", "Detail"], widths: [2, 1, 6], rows: D.health.map(function (h) { return [h[0], { good: "OK", warn: "Check", bad: "Down" }[h[1]] || h[1], h[2]]; }) },
+          { type: "heading", text: "Recent activity" },
+          { type: "table", head: ["When", "What happened"], widths: [1.4, 6], rows: D.activity.map(function (a) { return [dateTime(a.at), a.text]; }) }
+        ]
+      };
+    });
   }
 
   // =====================================================
@@ -221,7 +252,7 @@
 
   function drawUsers() {
     view.innerHTML =
-      '<div class="view">' + header("Users & roles") +
+      '<div class="view">' + header("Users & roles", pdfBtn()) +
       '<div class="grid-auto" style="--min:180px" id="plans"></div>' +
       '<div class="toolbar">' +
         '<div class="search">' + icon("search", 18) + '<label class="sr-only" for="usearch">Search users</label>' +
@@ -232,14 +263,11 @@
       '<div class="card table-card"><div class="table-scroll"><table style="min-width:960px">' +
         "<thead><tr><th>User and mobile</th><th>Designation and company</th><th>Role</th><th>Plan</th><th>Status</th><th>Activity</th><th class=\"right\">Actions</th></tr></thead>" +
         '<tbody id="user-rows"></tbody></table></div><p class="empty" id="no-users" hidden>No users match this search.</p></div>' +
-      '<p class="faint" style="font-size:13px">Everyone is on the Free plan for now. Basic, Pro and Premium unlock here once paid plans launch. ' +
-      "Your own account is locked so you cannot remove or suspend yourself" +
-      (iAmSuper ? "." : ", and only a superadmin can change another admin.") +
-      " To add another admin, have them sign up first, then set their role to Admin.</p>" +
       "</div>";
 
     $("#usearch").addEventListener("input", function (e) { userQuery = e.target.value; renderUserRows(); });
     drawUsersDynamic();
+    wirePdf("hiriq-users.pdf", usersPdf);
 
     // One delegated listener for the table's controls
     var tbody = $("#user-rows");
@@ -251,7 +279,7 @@
       if (el.matches("[data-field=role]")) {
         change(u, { role: el.value }, u.name + " is now " + el.value + ".");
       } else if (el.matches("[data-field=plan]")) {
-        change(u, { plan: el.value }, u.name + " is on the " + el.value + " plan.");
+        change(u, { plan: el.value }, u.name + " is now on the " + cap(el.value) + " plan.");
       }
     });
     tbody.addEventListener("click", function (e) {
@@ -277,6 +305,28 @@
     });
   }
 
+  function visibleUsers() {
+    var q = userQuery.toLowerCase();
+    return users.filter(function (u) {
+      var hay = (u.name + " " + u.email + " " + (u.username || "") + " " + (u.phone || "") + " " + (u.company || "") + " " + (u.designation || "")).toLowerCase();
+      return (userFilter === "all" || u.role === userFilter) && (!q || hay.indexOf(q) >= 0);
+    });
+  }
+  function usersPdf() {
+    var rows = visibleUsers();
+    var scope = (userFilter === "all" ? "All roles" : cap(userFilter) + "s") + (userQuery ? ", matching \"" + userQuery + "\"" : "");
+    return {
+      title: "Users & roles", subtitle: scope + " (" + rows.length + " of " + users.length + " accounts)",
+      blocks: [
+        { type: "kpis", items: plans.map(function (p) { return [p.name + " plan", fmt(users.filter(function (u) { return u.plan === p.id; }).length), "accounts"]; }) },
+        { type: "heading", text: "Accounts" },
+        { type: "table", head: ["Name", "Email", "Username", "Phone", "Role", "Plan", "Status", "Joined", "Last active"], widths: [2.2, 3.2, 2, 2, 1.3, 1.1, 1.3, 1.6, 1.6],
+          rows: rows.map(function (u) { return [u.name, u.email, u.username || "-", u.phone || "-", cap(u.role), cap(u.plan), u.status, dateShort(u.joined), u.last ? dateShort(u.last) : "Never"]; }) }
+      ]
+    };
+  }
+  function cap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : ""; }
+
   function say(kind, text) { usersToast = { kind: kind, text: text }; drawUsersDynamic(); }
 
   function change(u, patch, okText) {
@@ -295,11 +345,10 @@
   }
 
   function drawUsersDynamic() {
-    var live = plans.filter(function (p) { return p.live; }).map(function (p) { return p.id; });
     $("#plans").innerHTML = plans.map(function (p) {
       var n = users.filter(function (u) { return u.plan === p.id; }).length;
       return '<div class="plan' + (p.live ? " live" : "") + '"><div class="row-between"><span class="plan-name">' + esc(p.name) + '</span><span class="plan-badge">' + (p.live ? "Live" : "Soon") + "</span></div>" +
-        '<span class="mono" style="font-size:24px">' + fmt(n) + '</span><span class="faint" style="font-size:13px">' + (p.live ? "Accounts on this plan" : "Paid plan, not launched") + "</span></div>";
+        '<span class="mono" style="font-size:24px">' + fmt(n) + '</span><span class="faint" style="font-size:13px">Accounts on this plan</span></div>';
     }).join("");
     var counts = { all: users.length, candidate: 0, recruiter: 0, admin: 0 };
     users.forEach(function (u) { counts[u.role]++; });
@@ -317,11 +366,7 @@
   }
 
   function renderUserRows() {
-    var q = userQuery.toLowerCase();
-    var shown = users.filter(function (u) {
-      var hay = (u.name + " " + u.email + " " + (u.username || "") + " " + (u.phone || "") + " " + (u.company || "") + " " + (u.designation || "")).toLowerCase();
-      return (userFilter === "all" || u.role === userFilter) && (!q || hay.indexOf(q) >= 0);
-    });
+    var shown = visibleUsers();
     $("#user-rows").innerHTML = shown.map(function (u) {
       var dis = u.locked ? " disabled" : "";
       var roleOpts = ["candidate", "recruiter", "admin"].map(function (r) {
@@ -329,7 +374,7 @@
         return '<option value="' + r + '"' + (u.role === r ? " selected" : "") + (blocked ? " disabled" : "") + ">" + r.charAt(0).toUpperCase() + r.slice(1) + "</option>";
       }).join("");
       var planOpts = plans.map(function (p) {
-        return '<option value="' + esc(p.id) + '"' + (u.plan === p.id ? " selected" : "") + (p.live ? "" : " disabled") + ">" + esc(p.name) + (p.live ? "" : " (soon)") + "</option>";
+        return '<option value="' + esc(p.id) + '"' + (u.plan === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>";
       }).join("");
       var toggleLabel = (u.status === "Suspended" ? "Reactivate " : "Suspend ") + u.name;
       var del = armedDelete === u.id
@@ -360,7 +405,7 @@
   // =====================================================
   var ai = window.HiriqAdminAI ? window.HiriqAdminAI({
     view: view, esc: esc, fmt: fmt, icon: icon, api: api, ago: ago, header: header, loading: loading, failure: failure, meter: meter,
-    barChart: barChart, wireBarChart: wireBarChart,
+    barChart: barChart, wireBarChart: wireBarChart, pdfBtn: pdfBtn, wirePdf: wirePdf, dateTime: dateTime,
     next: function () { return ++navId; }, current: function (id) { return id === navId; }
   }) : null;
   function renderAi() {
@@ -369,15 +414,20 @@
   }
 
   // =====================================================
-  // JOBS & MODEL QUALITY: nothing real to show yet
+  // JOBS & SOURCES (see admin-jobs.js) and MODEL QUALITY (nothing real to show yet)
   // =====================================================
+  var jobsView = window.HiriqAdminJobs ? window.HiriqAdminJobs({
+    view: view, esc: esc, fmt: fmt, icon: icon, api: api, ago: ago, dateShort: dateShort, header: header, loading: loading, failure: failure,
+    pdfBtn: pdfBtn, wirePdf: wirePdf, next: function () { return ++navId; }, current: function (id) { return id === navId; }
+  }) : null;
+  function renderJobs() {
+    if (jobsView) jobsView.show();
+    else failure("Jobs & sources", "The jobs module did not load. Refresh the page.");
+  }
   function renderNotBuilt(title, text) {
     ++navId;
     view.innerHTML = '<div class="view">' + header(title, "", false) +
       '<div class="card card-stack" style="gap:10px"><h2 class="card-title">Nothing to show yet</h2><p class="muted" style="margin:0;max-width:62ch">' + esc(text) + "</p></div></div>";
-  }
-  function renderJobs() {
-    renderNotBuilt("Jobs & sources", "Job ingestion starts with the job-recommendation step. Until postings are stored there are no sources, counts or searches to show, and this page will not show made-up numbers.");
   }
   function renderModel() {
     renderNotBuilt("Model quality", "Ranking quality needs a labeled set of resume and job pairs to measure against (see ml/README.md). Once the matcher exists and is evaluated, its real scores will appear here.");
@@ -401,10 +451,18 @@
         return '<div class="audit-row" style="animation-delay:' + Math.min(i, 20) * 0.03 + 's"><span class="mono">' + esc(dateTime(e.at)) + '</span><span class="audit-tag" style="border-color:rgb(var(--' + (TAG[e.category] || "a1") + '))">' + esc(e.category) +
           "</span><span><strong>" + esc(e.actor) + "</strong> " + esc(e.action) + "</span></div>";
       }).join("");
-      view.innerHTML = '<div class="view">' + header("Audit log") + '<div class="filters" role="group" aria-label="Filter by event type">' + filters + "</div>" +
+      view.innerHTML = '<div class="view">' + header("Audit log", pdfBtn()) + '<div class="filters" role="group" aria-label="Filter by event type">' + filters + "</div>" +
         '<div class="card" style="padding:8px 0">' + (rows || '<p class="empty">No events yet.</p>') + "</div></div>";
       view.querySelectorAll("[data-af]").forEach(function (b) {
         b.addEventListener("click", function () { auditFilter = b.getAttribute("data-af"); renderAudit(); });
+      });
+      wirePdf("hiriq-audit-log.pdf", function () {
+        var label = { all: "All events", Auth: "Sign-ins", Users: "Users", Model: "Model", Data: "Data" }[auditFilter];
+        return {
+          title: "Audit log", subtitle: label + " (" + r.data.events.length + " most recent)",
+          blocks: [{ type: "table", head: ["When", "Type", "Who", "What they did"], widths: [1.6, 1, 1.8, 6],
+            rows: r.data.events.map(function (e) { return [dateTime(e.at), e.category, e.actor, e.action]; }) }]
+        };
       });
     });
   }

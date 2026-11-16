@@ -1,0 +1,23 @@
+Asha Rao
+Data Analyst | Mumbai, Maharashtra | asha.rao@example.com
+
+SUMMARY
+Data analyst with 4+ years turning marketing and sales data into dashboards and decisions for business teams.
+
+EXPERIENCE
+Senior Data Analyst, Northwind Retail — Mumbai                                   Apr 2024 – Present
+• Built Power BI dashboards on website traffic and campaign performance for the marketing team, cutting weekly reporting time by 60%.
+• Wrote SQL and Python (pandas) pipelines that load Google Analytics 4 and CRM data into BigQuery every morning.
+• Presented monthly insights to marketing leadership in PowerPoint, turning funnel and conversion trends into clear recommendations.
+• Automated recurring Excel reports with Python scripts and scheduled refreshes.
+
+Data Analyst, Contoso Ltd — Pune                                                 Jul 2021 – Mar 2024
+• Analysed customer journeys and churn with SQL and Tableau, and segmented users for email campaigns.
+• Maintained a Looker Studio dashboard for the sales team and validated data quality across three sources.
+• Worked with stakeholders to gather reporting requirements and prioritised competing requests.
+
+EDUCATION
+B.Tech in Computer Science, 2021
+
+SKILLS
+Skills: SQL, Python, Power BI, Tableau, Excel, Google Analytics, BigQuery, Looker Studio, PowerPoint, Data Visualization, A/B Testing

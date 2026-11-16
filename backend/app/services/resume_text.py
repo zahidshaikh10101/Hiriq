@@ -64,6 +64,29 @@ def _with_links(text: str, links: list[str]) -> str:
     return text + "\n\nLinks in the file:\n" + "\n".join(seen[:20])
 
 
+def _glue_share(text: str) -> float:
+    """Share of the letters that sit in 25+ character runs with no space (links and emails aside). English words almost
+    never reach 25 letters, so in real text this is about 0; in a page whose words ran together it is most of the page."""
+    words = [w for w in text.split() if not ("://" in w or "@" in w or w.lower().startswith("www."))]
+    total = sum(len(w) for w in words)
+    return sum(len(w) for w in words if len(w) >= 25) / total if total >= 40 else 0.0
+
+
+def looks_glued(text: str) -> bool:
+    """True when the words of a page ran together ("Builtafull-stackAIcareer..."). Some PDFs (LaTeX ones above all) have no
+    space characters, only small gaps between words, and pdfplumber's default 3-point gap is too wide for them."""
+    return _glue_share(text) > 0.15
+
+
+def _page_text(page) -> str:
+    text = page.extract_text() or ""
+    if looks_glued(text):
+        tighter = page.extract_text(x_tolerance=1.5) or ""
+        if tighter.strip() and _glue_share(tighter) < _glue_share(text):
+            return tighter
+    return text
+
+
 def _pdf(data: bytes) -> str:
     import pdfplumber
 
@@ -72,7 +95,7 @@ def _pdf(data: bytes) -> str:
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             for page in pdf.pages[:MAX_PAGES]:
-                parts.append(page.extract_text() or "")
+                parts.append(_page_text(page))
                 links += [h["uri"] for h in (page.hyperlinks or []) if h.get("uri")]
     except Exception as exc:  # noqa: BLE001  (pdfminer raises a different type for every kind of damage)
         raise ResumeFileError("unreadable", "This PDF could not be opened. It may be damaged or password protected.") from exc

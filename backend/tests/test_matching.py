@@ -120,6 +120,8 @@ def test_c_plus_plus_and_c_sharp_are_not_c():
     ("Diploma in Computer Engineering", {2}), ("12th Science", {1}), ("Bachelor's or Master's degree", {3, 4}),
     ("B.E. / B.Tech / M.Tech", {3, 4}), ("Any graduate", {3}),
     ("MS Excel", set()), ("IIT Bombay", set()), ("to be or not to be", set()), ("", set()), (None, set()),
+    # "LLM" is a large language model, not the LL.M. law degree (it made every GenAI post look like it wanted a master's)
+    ("Experience with GenAI/LLM integrations", set()), ("LLM fine-tuning", set()), ("LL.M. in Corporate Law", {4}),
 ])
 def test_degree_levels(text, levels):
     assert m.degree_levels(text) == levels

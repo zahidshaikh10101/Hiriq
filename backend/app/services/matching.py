@@ -206,7 +206,7 @@ LEVEL_NAME = {5: "a doctorate", 4: "a master's degree", 3: "a bachelor's degree"
 LEVEL_SHORT = {5: "doctorate", 4: "master's", 3: "bachelor's", 2: "diploma", 1: "school certificate"}
 _LEVEL_PATTERNS: list[tuple[int, re.Pattern]] = [
     (5, re.compile(r"\bph\.?\s?d\b|\bdoctorate\b|\bdoctoral\b", re.I)),
-    (4, re.compile(r"\bm\.?\s?tech\b|\bmaster(?:'?s)?\b|\bm\.?\s?sc\b|\bm\.?\s?c\.?\s?a\b|\bmba\b|\bpgdm\b|\bpgdba\b|\bpgdca\b|\bpost[\s-]?graduat\w*(?:\s+(?:diploma|degree|certificate))?|\bm\.?\s?com\b|\bm\.?\s?phil\b|\bm\.?\s?stat\b|\bm\.?\s?arch\b|\bll\.?m\b", re.I)),
+    (4, re.compile(r"\bm\.?\s?tech\b|\bmaster(?:'?s)?\b|\bm\.?\s?sc\b|\bm\.?\s?c\.?\s?a\b|\bmba\b|\bpgdm\b|\bpgdba\b|\bpgdca\b|\bpost[\s-]?graduat\w*(?:\s+(?:diploma|degree|certificate))?|\bm\.?\s?com\b|\bm\.?\s?phil\b|\bm\.?\s?stat\b|\bm\.?\s?arch\b|\bll\.\s?m\b", re.I)),
     # two-letter forms are matched in capitals only, and "MS Excel" is not "MS": they need dots or a following "in", "/", "," or ")"
     (4, re.compile(r"\bM\.[SAE]\b|\b(?:MS|MA|ME)\b(?=\s*(?:in\b|degree|[(/,\-]|$))")),
     (3, re.compile(r"\bb\.?\s?tech\b|\bbachelor(?:'?s)?\b|\bb\.?\s?sc\b|\bb\.?\s?c\.?\s?a\b|\bbba\b|\bb\.?\s?com\b|\bb\.?\s?arch\b|\bb\.?\s?pharm\b|\bundergraduate\b|\bllb\b", re.I)),

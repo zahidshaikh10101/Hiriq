@@ -1,4 +1,8 @@
 /* Hiriq — candidate workspace additions: documents, find-work screens and the sidebar group labels. Loaded after candidate.css. */
+/* Sidebar: the candidate menu has the most links, so it is a little tighter than the others and scrolls on short screens */
+.cand-nav { gap: 3px; }
+.cand-nav a { min-height: 42px; }
+.cand-nav .nav-label:first-of-type { margin-top: 10px; }
 /* Sidebar group labels */
 .side-nav .nav-label { margin: 14px 0 2px; padding: 0 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--ink) / 0.45); }
 
@@ -32,3 +36,25 @@
 .match-pill.match-mid { border-color: rgb(var(--warn) / .5); background: rgb(var(--warn) / .12); color: rgb(var(--warn)); }
 .match-pill.match-low { border-color: rgb(var(--bad) / .4); background: rgb(var(--bad) / .1); color: rgb(var(--bad)); }
 .match-pill.match-none { font-size: 12px; font-weight: 500; opacity: .75; background: transparent; border-style: dashed; }
+
+/* Job preferences card */
+.pref-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border-radius: 999px; font-size: 13px; border: 1px solid rgb(var(--a2) / .4); background: rgb(var(--a2) / .12); }
+.pref-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 6px; opacity: .7; border-radius: 50%; }
+.pref-chip button:hover, .pref-chip button:focus-visible { opacity: 1; background: rgb(var(--ink) / .1); }
+.pref-toggle { padding: 6px 14px; border-radius: 999px; font-size: 13px; cursor: pointer; color: inherit; border: 1px solid rgb(var(--ink) / .2); background: transparent; }
+.pref-toggle[aria-pressed="true"] { border-color: rgb(var(--a2) / .6); background: rgb(var(--a2) / .18); font-weight: 600; }
+
+/* Insights: compact skills and experience */
+.skill-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px 22px; }
+.skill-group { display: flex; flex-direction: column; gap: 6px; }
+.skill-cat { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: rgb(var(--ink) / .6); }
+.skill-cat small { font-weight: 500; opacity: .7; margin-left: 4px; }
+.exp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.exp-row { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; padding: 8px 0; border-top: 1px solid rgb(var(--ink) / .08); font-size: 14px; }
+.exp-row strong { grid-column: 1; }
+.exp-row span { grid-column: 1; font-size: 13px; color: rgb(var(--ink) / .65); }
+.exp-row small { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 12px; opacity: .6; white-space: nowrap; }
+.exp-more summary { cursor: pointer; font-size: 13px; padding: 6px 0; color: rgb(var(--a2)); }
+
+/* My profile now holds the insights: keep their cards spaced like the cards around them */
+.insights-slot { display: flex; flex-direction: column; gap: 18px; }

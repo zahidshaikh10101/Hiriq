@@ -234,3 +234,46 @@ def test_parse_keeps_the_portfolio_in_the_profile(monkeypatch):
     out = resume.parse("Aarav CV.pdf", S.make_pdf(S.SAMPLE_LINES + ["Portfolio: aarav.dev"]), today=TODAY)
     assert out["profile"]["portfolio_url"] == "https://aarav.dev"
     assert resume.parse("Aarav CV.pdf", S.make_pdf(S.SAMPLE_LINES), today=TODAY)["profile"]["portfolio_url"] is None
+
+
+def _gapped_pdf(lines):
+    """A PDF like LaTeX makes: words drawn one by one with a 2.2-point gap and no space characters between them."""
+    import io
+
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf)
+    y = 760
+    for line in lines:
+        x = 50
+        for w in line.split():
+            c.drawString(x, y, w)
+            x += stringWidth(w, "Helvetica", 12) + 2.2
+        y -= 18
+    c.save()
+    return buf.getvalue()
+
+
+GAPPED = ["Built a full-stack AI career intelligence platform using FastAPI and OpenRouter",
+          "Senior Executive Business Intelligence Apr 2024 - Jun 2026",
+          "Skills: Python, SQL, PySpark, Power BI, Tableau, Scikit-learn, Generative AI",
+          "Wrote PySpark workflows to process 50M rows of DSP log data monthly across 4 platforms"]
+
+
+def test_a_pdf_without_space_characters_still_reads_as_words():
+    text = resume_text.extract_text(_gapped_pdf(GAPPED))
+    assert "Built a full-stack AI career intelligence platform using FastAPI and OpenRouter" in text
+    assert "Apr 2024 - Jun 2026" in text and "Skills: Python, SQL, PySpark" in text
+    assert not resume_text.looks_glued(text)
+
+
+def test_the_glue_check():
+    assert resume_text.looks_glued("Builtafull-stackAIcareerintelligenceplatformusingFastAPIandOpenRouter to parse resumes and "
+                                   "matchthemwithjobdescriptionsautomatically every single morning for candidates")
+    assert not resume_text.looks_glued("Built Power BI dashboards on website traffic and campaign performance for the marketing team")
+    assert not resume_text.looks_glued("short")
+    # long real words alone do not trip it
+    assert not resume_text.looks_glued("Responsibilities include internationalization, telecommunications and characterization of "
+                                       "the counterrevolutionary data infrastructure for our stakeholders")

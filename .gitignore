@@ -22,4 +22,5 @@ Thumbs.db
 # Uploads / local data
 backend/uploads/
 *.log
-*.sqlite3
+*.sqlite3ml/notebooks/jobbert_structured.json
+ml/notebooks/labels.json

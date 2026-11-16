@@ -20,7 +20,9 @@
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
     ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
     trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
-    logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/>'
+    logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/>',
+    download: '<path d="M12 4v11M7.5 11L12 15.5 16.5 11"/><path d="M5 19h14"/>',
+    edit: '<path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3z"/><path d="M14.5 7.5l3 3"/>',
   };
   var symbols = Object.keys(paths)
     .map(function (name) {

@@ -1,0 +1,119 @@
+[
+  {
+    "title": "Senior Data Analyst - AI & Automation",
+    "company": "QualityAI",
+    "location": "Bengaluru, Karnataka",
+    "employment_type": "Full–time",
+    "work_mode": null,
+    "experience_min": 5,
+    "experience_max": 8,
+    "qualification": null,
+    "qualification_level": null,
+    "skills_required": [
+      "sql",
+      "llm",
+      "etl",
+      "python",
+      "looker",
+      "tableau",
+      "power bi",
+      "javascript",
+      "workspace",
+      "powerpoint",
+      "google sheets",
+      "google slides",
+      "google apps script",
+      "model context protocol"
+    ],
+    "skills_nice": [],
+    "domain": [
+      "ai tooling",
+      "data governance",
+      "data validation",
+      "data extraction",
+      "google ecosystem",
+      "pipeline creation",
+      "tool orchestration",
+      "data visualization"
+    ],
+    "soft_skills": [
+      "analytical thinking",
+      "curious",
+      "high attention to detail",
+      "independent problem-solving",
+      "communication skills"
+    ],
+    "responsibilities": [
+      "We are looking for an innovative Data Analyst with AI Experience to bridge traditional data analysis with modern AI-driven automation.",
+      "You will manage large datasets, build insightful dashboards, and leverage cutting-edge AI and scripting tools to fundamentally transform how data workflows operate within a Google-integrated ecosystem.",
+      "data analysis & dashboards",
+      "Process complex datasets using SQL, Python, and Google Sheets, and build interactive reports using Tableau, Power BI, or Looker Studio.",
+      "ai-first automation & mcp integration",
+      "Design and deploy Model Context Protocol (MCP) standards and LLM integrations to allow AI agents to safely connect with enterprise data sources and execute multi-step workflows.",
+      "advanced scripting",
+      "Build robust data pipelines and complex automations using Python, and streamline day-to-day operations using JavaScript and Google Apps Script across Google Workspace.",
+      "etl & data governance",
+      "Manage basic ETL frameworks, data validation, reconciliation, and consistency across platforms.",
+      "stakeholder collaboration",
+      "Translate complex technical findings into clear insights using Google Slides or PowerPoint for cross-functional teams."
+    ],
+    "discovered": [],
+    "parsed_by": "jobbert-2",
+    "apply_url": "https://in.linkedin.com/jobs/view/senior-data-analyst-ai-automation-at-qualityai-4484985251",
+    "match": 46.5
+  },
+  {
+    "title": "Senior Analyst, Digital Analytics",
+    "company": "Labcorp",
+    "location": "Bengaluru, Karnataka",
+    "employment_type": "Full–time",
+    "work_mode": null,
+    "experience_min": 4,
+    "experience_max": 6,
+    "qualification": null,
+    "qualification_level": null,
+    "skills_required": [
+      "power bi",
+      "marketo",
+      "powerpoint",
+      "adobe journey optimizer",
+      "adobe customer journey analytics"
+    ],
+    "skills_nice": [],
+    "domain": [
+      "website traffic",
+      "data storytelling",
+      "website analytics",
+      "digital marketing",
+      "customer journeys",
+      "workspace reporting",
+      "adobe cja certification",
+      "digital analytics reporting"
+    ],
+    "soft_skills": [
+      "data storytelling skills",
+      "analytical and problem-solving skills",
+      "data storytelling",
+      "presentation skills",
+      "business mindset"
+    ],
+    "responsibilities": [
+      "Own and deliver website performance reporting using Adobe Customer Journey Analytics (CJA).",
+      "Analyze website traffic, user behavior, engagement, conversion trends, and customer journeys and translate data into actionable insights.",
+      "Develop and maintain campaign and marketing performance reporting, including channel, campaign, and marketing performance analysis.",
+      "Be well versed in reporting and analyzing campaign and marketing data imported from external data sources, such as Marketo, Adobe Journey Optimizer (AJO), and other marketing platforms.",
+      "Build and maintain CJA segments, calculated/custom fields, metrics, dimensions, and reporting components to support business and marketing requirements.",
+      "Automate CJA reporting and dashboards using Power BI, reducing manual reporting effort and improving reporting efficiency.",
+      "Identify trends, opportunities, anomalies, and performance drivers in digital and marketing data and proactively communicate key findings to stakeholders.",
+      "Develop executive-ready PowerPoint presentations and dashboards that clearly communicate performance, insights, and recommendations.",
+      "Demonstrate strong data storytelling skills, turning complex analytics into simple, clear, and business-focused narratives.",
+      "Present insights and recommendations confidently to marketing, business, and leadership teams.",
+      "Partner with marketing, implementation, and analytics teams to understand reporting requirements and deliver scalable and effective analytics solutions.",
+      "Continuously identify opportunities to improve reporting processes, automation, data quality, and the overall effectiveness of digital analytics reporting."
+    ],
+    "discovered": [],
+    "parsed_by": "jobbert-2",
+    "apply_url": "https://careers.labcorp.com/senior-analyst-digital-analytics/job/2636637",
+    "match": 36.9
+  }
+]
