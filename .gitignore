@@ -24,3 +24,16 @@ backend/uploads/
 *.log
 *.sqlite3ml/notebooks/jobbert_structured.json
 ml/notebooks/labels.json
+
+
+*.sqlite3
+
+# ML notebooks: local data and the scraper's browser profile
+ml/notebooks/.gjobs_profile/
+backend/.gjobs_profile/
+ml/notebooks/.ipynb_checkpoints/
+ml/notebooks/gjobs_*.json
+ml/notebooks/gjobs_*.csv
+ml/notebooks/debug_*.html
+ml/notebooks/jobbert_structured.json
+ml/notebooks/labels.json

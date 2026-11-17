@@ -13,6 +13,8 @@ import re
 from app.services import matching
 
 MAX_REQUIRED, MAX_NICE = 15, 10
+# No real post asks for more; "35 years" is a "3-5" whose dash got lost on the way. Rather no number than a wrong one.
+MAX_YEARS = 25
 _NICE_WORDS = re.compile(r"\b(preferred|desirable|desired|nice[\s-]to[\s-]have|good[\s-]to[\s-]have|bonus|added advantage|an advantage|a plus|is a plus|optional)\b", re.I)
 _REQ_HEAD = re.compile(r"\b(required|requirements?|essential|must[\s-]have|qualifications?|what we look for|what you bring|responsibilities|key skills|skills required|you will need)\b", re.I)
 _YEARS = r"(?:years?|yrs?)"
@@ -41,11 +43,11 @@ def _near_experience(text: str, a: int, b: int) -> bool:
 def _years(text: str) -> tuple[int | None, int | None]:
     for m in _RANGE.finditer(text):
         lo, hi = int(m.group(1)), int(m.group(2))
-        if 0 <= lo <= hi <= 40 and _near_experience(text, m.start(), m.end()):
+        if 0 <= lo <= hi <= MAX_YEARS and _near_experience(text, m.start(), m.end()):
             return lo, hi
     for m in _MIN.finditer(text):
         n = next((int(g) for g in m.groups() if g), None)
-        if n is not None and 0 < n <= 40 and _near_experience(text, m.start(), m.end()):
+        if n is not None and 0 < n <= MAX_YEARS and _near_experience(text, m.start(), m.end()):
             return n, None
     return None, None
 

@@ -364,3 +364,21 @@ def test_redaction_removes_identity_before_text_leaves_the_server():
 
 def test_text_hash_changes_when_the_resume_changes():
     assert m.text_hash("a") == m.text_hash("a") != m.text_hash("b") and m.text_hash(None) == m.text_hash("")
+
+
+@pytest.mark.parametrize("skill,text", [
+    ("data modeling", "Data Modelling, Data Cleaning"), ("data visualization", "Data Visualisation"),
+    ("optimization", "query optimisation"), ("behavior analysis", "behaviour analysis"), ("data catalog", "a data catalogue"),
+])
+def test_british_and_american_spellings_match(skill, text):
+    assert m._pattern(skill).search(text)
+
+
+def test_spelling_variants_stay_whole_words():
+    assert not m._pattern("data modeling").search("data modellingx")
+    assert m._pattern("size").search("size") and not m._pattern("size").search("sise")
+
+
+def test_a_british_spelling_on_the_resume_counts_as_the_skill():
+    res = m.assess_skill("data modeling", {}, ["Built star-schema Data Modelling for finance reports"])
+    assert res["status"] == "text" and res["credit"] == 1.0

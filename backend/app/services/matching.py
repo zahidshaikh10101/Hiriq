@@ -123,6 +123,25 @@ def family_of(c: str) -> set[str]:
     return out
 
 
+_SPELLING = [
+    (re.compile(r"i[sz](ations?|ing|ed|ers?|es?)$"), r"i[sz]\1"),       # visualisation / visualization, optimise / optimize
+    (re.compile(r"ell?(ing|ed|ers?)$"), r"ell?\1"),                    # modelling / modeling, labelled / labeled
+    (re.compile(r"^analy[sz]"), "analy[sz]"),                           # analyse / analyze
+    (re.compile(r"o(?:u)?r$"), "o(?:u)?r"),                             # behaviour / behavior, colour / color
+    (re.compile(r"(?<=catalog)(?:ue)?$"), "(?:ue)?"),                   # catalogue / catalog
+]
+
+
+def _spelling(word: str) -> str:
+    """British and American spellings match each other: a resume's "Data Modelling" is the job's "data modeling".
+    Only long-enough words, so short ones ("size", "rise", "four") stay exact."""
+    if len(word) < 6 or not word.isalpha():
+        return word
+    for pat, rep in _SPELLING:
+        word = pat.sub(rep, word)
+    return word
+
+
 @lru_cache(maxsize=2048)
 def _pattern(alias: str) -> re.Pattern | None:
     """Whole-word, case-insensitive pattern. 'power bi' also matches 'PowerBI' and 'power-bi'.
@@ -131,7 +150,7 @@ def _pattern(alias: str) -> re.Pattern | None:
     if len(re.sub(r"[^a-z0-9]", "", a)) < 3 and a not in ("c#", "c++"):
         return None
     pieces = re.split(r"(?<=[a-z0-9])[\s._\-]+(?=[a-z0-9])", a)
-    body = r"[\s._\-]?".join(re.escape(p) for p in pieces)
+    body = r"[\s._\-]?".join(_spelling(re.escape(p)) for p in pieces)
     tail = "" if a[-1] in "+#" else r"(?![+#])"
     return re.compile(r"(?<![A-Za-z0-9])" + body + r"(?![A-Za-z0-9])" + tail, re.I)
 

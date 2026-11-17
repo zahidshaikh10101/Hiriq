@@ -34,3 +34,10 @@ def test_odd_input_never_raises():
     for bad in (None, "", "   \n\n", "x" * 50000):
         r = postingread.read(None, bad)
         assert r["skills_required"] == [] and r["skills_nice"] == [] and r["experience_min"] is None
+
+
+def test_impossible_years_are_left_out():
+    # "35 years" is a "3-5" that lost its dash: better no number than asking for 35 years
+    assert postingread._years("35 years of experience in Healthcare / Pharma / Life Sciences Analytics.") == (None, None)
+    assert postingread._years("Experience: 4 to 7 Years") == (4, 7)
+    assert postingread._years("Minimum 25 years of experience") == (25, None)
